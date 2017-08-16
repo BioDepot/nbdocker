@@ -1,0 +1,7 @@
+Type: IPython Notebook Extension
+Compatibility: 4.x 5.x
+Name: nbdocker
+Main: main.js
+Description: Adds a button to manage your docker.
+Link: readme.md
+Icon: logo.svg

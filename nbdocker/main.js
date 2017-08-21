@@ -1,10 +1,42 @@
 define([
+    'require',
     'base/js/namespace',
     'base/js/dialog',
     'base/js/utils',
     'jquery',
-    'require'
-], function(IPython, dialog, utils, $, require) {
+    './progressbar',
+    './notify'
+], function(require, IPython, dialog, utils, $, ProgressBar) {
+
+    function PullImage(image_name, image_version) {
+        this.name = image_name;
+        this.version = image_version;
+        this.callback = null;
+    }
+
+    PullImage.prototype.onMessage = function(cb) {
+        this.callback = cb;
+    };
+
+    PullImage.prototype.fetch = function() {
+        var pullUrl = utils.url_path_join(IPython.notebook.base_url, "dockerpull");
+        pullUrl = pullUrl + '/' + this.name + '/' + this.version;
+
+        this.eventSource = new EventSource(pullUrl);
+        var that = this;
+        this.eventSource.addEventListener('message', function(event) {
+            var data = JSON.parse(event.data);
+            if (that.callback != undefined) {
+                that.callback(data);
+            }
+        });
+    };
+
+    PullImage.prototype.close = function() {
+        if (this.eventSource !== undefined) {
+            this.eventSource.close();
+        }
+    };
 
     var ajax = utils.ajax || $.ajax;
 
@@ -19,8 +51,24 @@ define([
     };
 
     var template_tab = `
-    <div class="col-sm-12">
-        <p class="text-primary text-right" id="infoTitle"/>
+    <div class="col-sm-12" style="margin-bottom: 4px;">
+        <div class="col-sm-6 row">
+            <div class="input-group">
+                <span class="input-group-addon">Image</span>
+                <input type="text" class="form-control col-sm-7" id="docker_image" placeholder="e.g. biodepot/bwb:latest"> 
+            </div>
+        </div>
+        <div class="col-sm-1">
+            <button class="btn btn-primary" id="pullImage">Pull</button>
+        </div>
+        <div class="col-sm-5">
+            <p class="text-primary text-right" id="infoTitle"/>
+        </div>
+    </div>
+    <div class="col-sm-12 progressbar" id="progress_container" style="height: 16px; margin-top: 4px; margin-bottom: 4px; display: none;">
+        <p id="progress_info"></p>
+    </div>
+    <div class="col-sm-12 progress_info" style="display: none;">
     </div>
     <ul class="nav nav-tabs">
         <li class="active"><a data-toggle="tab" href="#Containers" id="showContainers">Containers</a></li>
@@ -340,6 +388,76 @@ define([
                     });
 
                     ajax(service_url, docker_list_container);
+
+                    var bar = new ProgressBar.Line('#progress_container', {
+                        strokeWidth: 1,
+                        easing: 'easeInOut',
+                        duration: 1400,
+                        color: '#5cb85c',
+                        trailColor: '#eee',
+                        trailWidth: 1,
+                        text: {
+                            style: {
+                                // Text color.
+                                color: '#999',
+                                position: 'absolute',
+                                right: '0',
+                                top: '15px',
+                                padding: 0,
+                                margin: 0,
+                                transform: null
+                            },
+                            autoStyleContainer: false
+                        },
+                        step: (state, bar) => {
+                            bar.setText(Math.round(bar.value() * 100) + ' %');
+                        }
+                    });
+
+                    $('#pullImage').on('click', function() {
+                        var repo = $('#docker_image').val();
+                        var image_name = '';
+                        var image_version = '';
+
+                        repoTags = repo.split(':');
+                        if (repoTags.length == 2) {
+                            image_name = repoTags[0];
+                            image_version = repoTags[1];
+                        } else {
+                            image_name = repo;
+                            image_version = 'latest';
+                        }
+
+                        var pull = new PullImage(image_name, image_version);
+
+                        $('.progressbar').show();
+
+                        pull.onMessage(function(data) {
+                            if (data.message !== undefined) {
+                                var message_level = 'info';
+                                if (data.message == 'Succeeded') { message_level = "success"; } else if (data.message == 'Failed') { message_level = "error"; }
+                                if (data.message == 'Succeeded' || data.message == 'Failed' || data.message.indexOf('Image exists locally') != -1) {
+                                    $('.progressbar').hide();
+                                    pull.close();
+                                    bar.set(0);
+                                    $("#docker_image").notify(
+                                        data.message, message_level, { position: "bottom" }
+                                    );
+                                    if (data.message == 'Succeeded') {
+                                        ajax(service_url, docker_list_images);
+                                    }
+                                }
+                                console.log(data.message);
+                            } else if (data.progress != undefined) {
+                                bar.animate(data.progress / 100.0);
+                            } else {
+                                console.log(data);
+                            }
+                        });
+
+                        pull.fetch();
+                        return false;
+                    });
                 }
             });
             dockerDialog.find(".modal-content").attr('style', 'width: 900px');

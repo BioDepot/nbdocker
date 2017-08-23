@@ -5,19 +5,19 @@ define([
     'base/js/utils',
     'jquery',
     './progressbar',
+    './xterm.js-2.9.2/xterm',
+    './xterm.js-2.9.2/addons/fit/fit',
     './notify'
-], function(require, IPython, dialog, utils, $, ProgressBar) {
+], function(require, IPython, dialog, utils, $, ProgressBar, Terminal, fitAddon) {
 
     function PullImage(image_name, image_version) {
         this.name = image_name;
         this.version = image_version;
         this.callback = null;
     }
-
     PullImage.prototype.onMessage = function(cb) {
         this.callback = cb;
     };
-
     PullImage.prototype.fetch = function() {
         var pullUrl = utils.url_path_join(IPython.notebook.base_url, "dockerpull");
         pullUrl = pullUrl + '/' + this.name + '/' + this.version;
@@ -31,8 +31,33 @@ define([
             }
         });
     };
-
     PullImage.prototype.close = function() {
+        if (this.eventSource !== undefined) {
+            this.eventSource.close();
+        }
+    };
+
+    function BuildImage(uuid) {
+        this.session_id = uuid;
+        this.callback = null;
+    };
+    BuildImage.prototype.onMessage = function(cb) {
+        this.callback = cb;
+    };
+    BuildImage.prototype.fetch = function() {
+        var buildlUrl = utils.url_path_join(IPython.notebook.base_url, "dockerbuild");
+        buildlUrl = buildlUrl + '/' + this.session_id;
+
+        this.eventSource = new EventSource(buildlUrl);
+        var that = this;
+        this.eventSource.addEventListener('message', function(event) {
+            var data = JSON.parse(event.data);
+            if (that.callback != undefined) {
+                that.callback(data);
+            }
+        });
+    };
+    BuildImage.prototype.close = function() {
         if (this.eventSource !== undefined) {
             this.eventSource.close();
         }
@@ -50,22 +75,29 @@ define([
         document.getElementsByTagName("head")[0].appendChild(link);
     };
 
+    var logBuilding = new Terminal({
+        convertEol: true,
+        disableStdin: true
+    });
+
     var template_tab = `
     <div class="col-sm-12" style="margin-bottom: 4px;">
-        <div class="col-sm-6 row">
+        <div class="col-sm-7 row">
             <div class="input-group">
                 <span class="input-group-addon">Image</span>
                 <input type="text" class="form-control col-sm-7" id="docker_image" placeholder="e.g. biodepot/bwb:latest"> 
+                <span class="input-group-btn">
+                    <button class="btn btn-default btn-primary" type="button" id="pullImage">
+                        <span class="fa fa-cloud-download"> Pull</span>
+                    </button>
+                </span>
             </div>
-        </div>
-        <div class="col-sm-1">
-            <button class="btn btn-primary" id="pullImage">Pull</button>
         </div>
         <div class="col-sm-5">
             <p class="text-primary text-right" id="infoTitle"/>
         </div>
     </div>
-    <div class="col-sm-12 progressbar" id="progress_container" style="height: 16px; margin-top: 4px; margin-bottom: 4px; display: none;">
+    <div class="col-sm-12 progressbar my-2" id="progress_container" style="height: 16px; display: none; ">
         <p id="progress_info"></p>
     </div>
     <div class="col-sm-12 progress_info" style="display: none;">
@@ -73,7 +105,7 @@ define([
     <ul class="nav nav-tabs">
         <li class="active"><a data-toggle="tab" href="#Containers" id="showContainers">Containers</a></li>
         <li><a data-toggle="tab" href="#Images" id="showImages">Images</a></li>
-        <li><a data-toggle="tab" href="#menu2">Build</a></li>
+        <li><a data-toggle="tab" href="#Build">Build</a></li>
     </ul>
 
     <div class="tab-content">
@@ -83,9 +115,29 @@ define([
         <div id="Images" class="tab-pane fade">
         <p>Loading...</p>
         </div>
-        <div id="menu2" class="tab-pane fade">
-        <h3>Menu 2</h3>
-        <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
+        <div class="container-fluid tab-pane fade" id="Build">
+            <div class="row content">
+                <div class="col-sm-12" id="build_left">
+                    <div class="form-group">
+                        <label for="b_img_name">Image name:</label>
+                        <input type="text" class="form-control" id="b_img_name">
+                    </div>
+                    <div class="form-group">
+                        <label for="b_docker_file">Docker file:</label>
+                        <textarea class="form-control" rows="20" id="b_docker_file"></textarea>
+                    </div>
+                </div>
+                <div class="col-sm-12 log-terminal" id="build-logs" style="display:none;">
+                </div>
+                <div class="col-sm-12">
+                    <button class="btn btn-default btn-primary" type="button" id="buildImage">
+                        <span class="fa fa-wrench"> Build</span>
+                    </button>
+                    <button class="btn btn-default btn-primary" type="button" id="view_build_logs">
+                        <span class="fa fa-history" aria-hidden="true"> logs</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
     `;
@@ -277,11 +329,7 @@ define([
         icon: 'docker-icon',
         help_index: '',
         handler: function(env) {
-            var on_success = undefined;
-            var on_error = undefined;
-
             var div = $('<div/>');
-
             div.append(template_tab);
 
             // get the canvas for user feedback
@@ -321,6 +369,49 @@ define([
                 ajax(service_url, docker_remove_container);
             };
 
+            function build_submit(image_name, docker_file) {
+                var uuid = '';
+                var docker_build_submit = {
+                    type: "POST",
+                    data: { cmd: "buildsubmit", image_name: image_name, docker_file: docker_file },
+                    success: function(data, status) {
+                        if ('uuid' in data) {
+                            stream_build_logs(data['uuid']);
+                        } else {
+                            logBuilding.write(data['message'] + '\n');
+                        }
+                    },
+                    error: function(jqXHR, status, err) {
+                        alert("submit build failed: " + err);
+                    }
+                };
+                ajax(service_url, docker_build_submit);
+            };
+
+            function stream_build_logs(uuid) {
+                console.log(uuid);
+                var builder = new BuildImage(uuid);
+                builder.onMessage(function(data) {
+                    if (data.status !== undefined) {
+                        if (data.status == 'Succeeded' || data.status == 'Failed') {
+                            builder.close();
+
+                            if (data.status == 'Succeeded') {
+                                //ajax(service_url, docker_list_images);
+                            }
+                        }
+                        //console.log(data.status);
+                        logBuilding.write(data.status + '\n');
+                    } else if (data.message != undefined) {
+                        logBuilding.write(data.message);
+                        //console.log('msg:' + data.message);
+                    } else {
+                        logBuilding.write(data);
+                    }
+                });
+                builder.fetch();
+            };
+
             var docker_info = {
                 type: "POST",
                 data: { cmd: "info" },
@@ -330,8 +421,7 @@ define([
                     var e = Math.floor(Math.log(mem_bytes) / Math.log(1024));
                     var memTotal = (mem_bytes / Math.pow(1024, e)).toFixed(2) + " " + " KMGTP".charAt(e) + "iB";
                     var info = "Docker Version: " + data['ServerVersion'] + " | CPU: " + data['NCPU'] + " | Memory: " + memTotal;
-                    $('#infoTitle').text(info)
-
+                    $('#infoTitle').text(info);
                 },
                 error: function(jqXHR, status, err) {
                     alert("get docker info failed: " + err);
@@ -414,6 +504,10 @@ define([
                         }
                     });
 
+                    logBuilding.open(document.getElementById('build-logs'));
+                    fitAddon.fit(logBuilding);
+                    //log.write('Hello from \033[1;3;31mxterm.js\033[0m $ ');
+
                     $('#pullImage').on('click', function() {
                         var repo = $('#docker_image').val();
                         var image_name = '';
@@ -456,7 +550,26 @@ define([
                         });
 
                         pull.fetch();
-                        return false;
+                    });
+
+                    $('#buildImage').on('click', function() {
+                        var image_name = $('#b_img_name').val();
+                        var docker_file = $('#b_docker_file').val();
+                        $('#build_left').hide();
+                        $('#build-logs').show();
+                        fitAddon.fit(logBuilding);
+                        build_submit(image_name, docker_file);
+                    });
+
+                    $('#view_build_logs').on('click', function() {
+                        if ($('#build-logs').css('display') == 'none') {
+                            $('#build_left').hide();
+                            $('#build-logs').show();
+                            fitAddon.fit(logBuilding);
+                        } else {
+                            $('#build-logs').hide();
+                            $('#build_left').show();
+                        }
                     });
                 }
             });
@@ -467,6 +580,7 @@ define([
     function load_ipython_extension() {
 
         load_css('./main.css');
+        load_css('./xterm.js-2.9.2/xterm.css');
         // log to console
         console.info('Loaded Jupyter extension: Docker for Jupter Notebook')
 

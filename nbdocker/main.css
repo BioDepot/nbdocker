@@ -3,3 +3,11 @@
     width: 16px;
     background: url(./logo.png) no-repeat;
 }
+
+.log-terminal {
+    padding: 5px;
+    background-color: #002b36;
+    height: 482px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}

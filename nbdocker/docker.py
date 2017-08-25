@@ -1,13 +1,13 @@
-import docker
-import json
-import re
 import os
-import tempfile
-import shutil
-from queue import Queue, Empty
-import uuid
+import re
+import json
 import threading
 import requests
+import tempfile
+import uuid
+import shutil
+import docker
+from queue import Queue, Empty
 from notebook.utils import url_path_join
 from notebook.base.handlers import IPythonHandler
 from tornado import web, gen
@@ -32,13 +32,14 @@ class Build:
         self.docker_file = docker_file
 
     def building(self):
+        # prepare building folder
+        # each building has its own temporary folder
         build_path = tempfile.mkdtemp(suffix='nbdocker')
         shadow_dockerfile = os.path.join(build_path, 'Dockerfile')
         with open(shadow_dockerfile, 'wb') as fp:
             fp.write(self.docker_file.encode('utf-8'))
 
         print('Start building image {0} ---->>> \n docker file: {1} \n use path: {2}'.format(self.image_name, shadow_dockerfile, build_path))
-
         try:
             for rawline in self.docker_.build(path=build_path, tag=self.image_name, dockerfile=shadow_dockerfile, rm=True):
                 for jsonstr in rawline.decode('utf-8').split('\r\n')[:-1]:
@@ -139,6 +140,7 @@ class DockerHandler(IPythonHandler):
     def _event_create_container(self):
         options = self.get_body_argument('options')
         options = json.loads(options)
+        # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock',
                    options['host']: options['container']}
         ports = {int(options['internal']): int(options['external'])}
@@ -191,7 +193,8 @@ class DockerHandler(IPythonHandler):
         # skip empty docker file
         if not docker_file.strip():
             return {'message': 'Error: empty Docker file'}
-
+        
+        # create a new build instance and return uuid to client
         return {'uuid': g_docker_builder.new_build(image_name, docker_file)}
 
 
@@ -220,10 +223,9 @@ class PullHandler(web.RequestHandler):
             image_name = registry + '/' + image_name
 
         # Check if the image exists locally!
-        # Assume we're running in single-node mode!
         docker_client = docker.from_env(version='auto')
         try:
-            image = docker_client.images.get(image_name)
+            docker_client.images.get(image_name)
             self.emit({'message': 'Image exists locally, pull completed.\n'})
             return
         except docker.errors.ImageNotFound:
@@ -232,13 +234,10 @@ class PullHandler(web.RequestHandler):
 
         q = Queue()
         pull = Pull(q, g_docker_, image_name, image_version)
-
         pull_thread = threading.Thread(target=pull.pull)
-
         pull_thread.start()
 
         done = False
-
         while True:
             try:
                 progress = q.get_nowait()
@@ -246,14 +245,13 @@ class PullHandler(web.RequestHandler):
                 yield gen.sleep(0.5)
                 continue
 
-            # FIXME: If pod goes into an unrecoverable stage, such as ImagePullBackoff or
-            # whatever, we should fail properly.
+            # event process
+            # We expect logs already JSON format
             if progress['kind'] == 'pull.status':
                 if progress['payload'] == 'Failed' or progress['payload'] == 'Succeeded':
                     done = True
                     event = {'message': progress['payload']}
             elif progress['kind'] == 'pull.progress':
-                # We expect logs to be already JSON structured anyway
                 event = {'progress': progress['payload']}
 
             try:
@@ -303,9 +301,6 @@ class Pull:
                     if (len(progs) > 0):
                         self.current_progress = sum(progs.values()) / len(progs)
                         self.progress('pull.progress', self.current_progress)
-            # for i in range(10):
-            #     self.progress('pull.progress', i+1)
-            #     sleep(1)
 
             self.progress('pull.status', 'Succeeded')
         except requests.exceptions.RequestException as e:
@@ -334,6 +329,7 @@ class BuildHandler(web.RequestHandler):
 
         done = False
 
+        # locate the build instance
         b = g_docker_builder.get_build(uid)
         if b is not None:
             while True:
@@ -348,7 +344,6 @@ class BuildHandler(web.RequestHandler):
                         done = True
                         event = {'status': msg['payload']}
                 elif msg['kind'] == 'build.message':
-                    # We expect logs to be already JSON structured anyway
                     event = {'message': msg['payload']}
 
                 try:
@@ -364,6 +359,7 @@ class BuildHandler(web.RequestHandler):
 def load_jupyter_server_extension(nb_app):
     web_app = nb_app.web_app
     host_pattern = '.*$'
+    # register handlers
     route_docker = url_path_join(web_app.settings['base_url'], '/docker')
     route_docker_pull = url_path_join(web_app.settings['base_url'], r"/dockerpull/([^/]+)/([^/]+)?/?([^/]+)?")
     route_docker_build = url_path_join(web_app.settings['base_url'], r"/dockerbuild/([^/]+)")

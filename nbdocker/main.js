@@ -10,6 +10,7 @@ define([
     './notify'
 ], function(require, IPython, dialog, utils, $, ProgressBar, Terminal, fitAddon) {
 
+    // Object for retrieve pull message
     function PullImage(image_name, image_version) {
         this.name = image_name;
         this.version = image_version;
@@ -19,6 +20,7 @@ define([
         this.callback = cb;
     };
     PullImage.prototype.fetch = function() {
+        // connect to /dockerpull, subscript events
         var pullUrl = utils.url_path_join(IPython.notebook.base_url, "dockerpull");
         pullUrl = pullUrl + '/' + this.name + '/' + this.version;
 
@@ -37,6 +39,7 @@ define([
         }
     };
 
+    // Object for retrieve building message
     function BuildImage(uuid) {
         this.session_id = uuid;
         this.callback = null;
@@ -45,6 +48,7 @@ define([
         this.callback = cb;
     };
     BuildImage.prototype.fetch = function() {
+        // connect to /dockerbuild, subscript events
         var buildlUrl = utils.url_path_join(IPython.notebook.base_url, "dockerbuild");
         buildlUrl = buildlUrl + '/' + this.session_id;
 
@@ -75,6 +79,7 @@ define([
         document.getElementsByTagName("head")[0].appendChild(link);
     };
 
+    // xterm.js object
     var logBuilding = new Terminal({
         convertEol: true,
         disableStdin: true
@@ -171,6 +176,7 @@ define([
     var ListContainer = function(containers) {
         containers.forEach(function(container) {
             var mountStr = '';
+            // format Volume Mounts to string
             container["Mounts"].forEach(function(volume) {
                 if (mountStr != '') { mountStr += "</BR>"; }
                 if (volume["Name"]) { mountStr += volume["Name"]; } else { mountStr += volume["Source"]; }
@@ -178,6 +184,7 @@ define([
             });
             container["Mounts"] = mountStr;
             var portStr = '';
+            // format Ports to string
             container["Ports"].forEach(function(port) {
                 if (portStr != '') { portStr += "</BR>"; }
                 if (port["IP"]) { portStr += port["IP"]; }
@@ -332,15 +339,7 @@ define([
             var div = $('<div/>');
             div.append(template_tab);
 
-            // get the canvas for user feedback
-            var container = $('#notebook-container');
-
-            function on_ok() {
-                // display preloader
-                //var preloader = '<img class="commit-feedback" src="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.5.8/ajax-loader.gif">';
-                // container.prepend(preloader);
-            };
-
+            // ajax request to create container
             function create_container(options) {
                 var docker_create_container = {
                     type: "POST",
@@ -355,6 +354,7 @@ define([
                 ajax(service_url, docker_create_container);
             };
 
+            // ajax request to remove container
             function remove_container(container_id) {
                 var docker_remove_container = {
                     type: "POST",
@@ -369,6 +369,7 @@ define([
                 ajax(service_url, docker_remove_container);
             };
 
+            // ajax requst to submit a building
             function build_submit(image_name, docker_file) {
                 var uuid = '';
                 var docker_build_submit = {
@@ -376,6 +377,7 @@ define([
                     data: { cmd: "buildsubmit", image_name: image_name, docker_file: docker_file },
                     success: function(data, status) {
                         if ('uuid' in data) {
+                            // submit successful, streaming logs....
                             stream_build_logs(data['uuid']);
                         } else {
                             logBuilding.write(data['message'] + '\n');
@@ -388,6 +390,7 @@ define([
                 ajax(service_url, docker_build_submit);
             };
 
+            // stream building logs
             function stream_build_logs(uuid) {
                 console.log(uuid);
                 var builder = new BuildImage(uuid);
@@ -400,11 +403,9 @@ define([
                                 //ajax(service_url, docker_list_images);
                             }
                         }
-                        //console.log(data.status);
                         logBuilding.write(data.status + '\n');
                     } else if (data.message != undefined) {
                         logBuilding.write(data.message);
-                        //console.log('msg:' + data.message);
                     } else {
                         logBuilding.write(data);
                     }
@@ -412,6 +413,7 @@ define([
                 builder.fetch();
             };
 
+            // ajax request to retrieve docker info
             var docker_info = {
                 type: "POST",
                 data: { cmd: "info" },
@@ -427,6 +429,8 @@ define([
                     alert("get docker info failed: " + err);
                 }
             };
+
+            // ajax request to list containers
             var docker_list_container = {
                 type: "POST",
                 data: { cmd: "listcontainer" },
@@ -441,6 +445,8 @@ define([
                     alert("remove container failed: " + err);
                 }
             };
+
+            // ajax request to list images
             var docker_list_images = {
                 type: "POST",
                 data: { cmd: "listimage" },
@@ -456,6 +462,7 @@ define([
                 }
             };
 
+            // MAIN dialog
             var dockerDialog = dialog.modal({
                 body: div,
                 title: 'Docker management',
@@ -467,9 +474,12 @@ define([
                 },
                 notebook: env.notebook,
                 keyboard_manager: env.notebook.keyboard_manager,
+
+                // event that main dialog is opening
                 open: function(event, ui) {
                     ajax(service_url, docker_info);
 
+                    // register event on click tabs( Containers | Images)
                     $('#showContainers').on('click', function() {
                         ajax(service_url, docker_list_container);
                     });
@@ -479,6 +489,7 @@ define([
 
                     ajax(service_url, docker_list_container);
 
+                    // progress bar instance for pulling image
                     var bar = new ProgressBar.Line('#progress_container', {
                         strokeWidth: 1,
                         easing: 'easeInOut',
@@ -504,10 +515,11 @@ define([
                         }
                     });
 
+                    // initialize xterm.js object
                     logBuilding.open(document.getElementById('build-logs'));
                     fitAddon.fit(logBuilding);
-                    //log.write('Hello from \033[1;3;31mxterm.js\033[0m $ ');
 
+                    // event of click on [Pull] button
                     $('#pullImage').on('click', function() {
                         var repo = $('#docker_image').val();
                         var image_name = '';
@@ -522,10 +534,10 @@ define([
                             image_version = 'latest';
                         }
 
-                        var pull = new PullImage(image_name, image_version);
-
                         $('.progressbar').show();
 
+                        // Pull events processor
+                        var pull = new PullImage(image_name, image_version);
                         pull.onMessage(function(data) {
                             if (data.message !== undefined) {
                                 var message_level = 'info';
@@ -552,6 +564,7 @@ define([
                         pull.fetch();
                     });
 
+                    // event of click on [Build] button
                     $('#buildImage').on('click', function() {
                         var image_name = $('#b_img_name').val();
                         var docker_file = $('#b_docker_file').val();
@@ -578,16 +591,15 @@ define([
     }
 
     function load_ipython_extension() {
-
         load_css('./main.css');
         load_css('./xterm.js-2.9.2/xterm.css');
         // log to console
-        console.info('Loaded Jupyter extension: Docker for Jupter Notebook')
+        console.info('Loaded Jupyter extension: Docker for Jupter Notebook');
 
         // register new action
-        var action_name = IPython.keyboard_manager.actions.register(docker_widget, 'manager', 'jupyter-docker')
-            // add button for new action
-        IPython.toolbar.add_buttons_group(['jupyter-docker:manager'])
+        var action_name = IPython.keyboard_manager.actions.register(docker_widget, 'manager', 'jupyter-docker');
+        // add button to toolbar
+        IPython.toolbar.add_buttons_group(['jupyter-docker:manager']);
 
     }
 

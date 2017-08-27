@@ -153,7 +153,7 @@ define([
         <th width=6%>#</th>
         <th width=6%>Container Id</th>
         <th width=20%>Image</th>
-        <th>Mounts</th>
+        <th width=48%>Mounts</th>
         <th width=20%>Ports</th>
         <th width=10%>Status</th>
         </tr></thead>
@@ -180,6 +180,7 @@ define([
             container["Mounts"].forEach(function(volume) {
                 if (mountStr != '') { mountStr += "</BR>"; }
                 if (volume["Name"]) { mountStr += volume["Name"]; } else { mountStr += volume["Source"]; }
+                if (mountStr.length > 32) { mountStr = mountStr.substring(0, 32) }
                 mountStr += "->" + volume["Destination"];
             });
             container["Mounts"] = mountStr;

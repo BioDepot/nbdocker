@@ -340,6 +340,8 @@ define([
             var div = $('<div/>');
             div.append(template_tab);
 
+            function on_ok() {};
+
             // ajax request to create container
             function create_container(options) {
                 var docker_create_container = {

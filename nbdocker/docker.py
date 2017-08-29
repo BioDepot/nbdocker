@@ -1,4 +1,5 @@
 import os
+import platform
 import re
 import json
 import threading
@@ -17,7 +18,10 @@ from tornado.iostream import StreamClosedError
 # global docker instance
 g_docker_ = None
 try:
-    g_docker_ = docker.APIClient(base_url='unix:///var/run/docker.sock')
+    if platform.system() is 'Windows':
+        g_docker_ = docker.APIClient(base_url='npipe:////./pipe/docker_engine')
+    else:
+        g_docker_ = docker.APIClient(base_url='unix:///var/run/docker.sock')
 except:
     g_docker_ = None
 
@@ -106,7 +110,10 @@ g_docker_builder = BuildManager()
 
 class DockerHandler(IPythonHandler):
     def initialize(self):
-        self._docker = docker.APIClient(base_url='unix:///var/run/docker.sock')
+        if platform.system() is 'Windows':
+            self._docker = docker.APIClient(base_url='npipe:////./pipe/docker_engine')
+        else:
+            self._docker = docker.APIClient(base_url='unix:///var/run/docker.sock')
 
     def post(self):
         dispatch_table = {

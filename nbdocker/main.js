@@ -179,8 +179,13 @@ define([
             // format Volume Mounts to string
             container["Mounts"].forEach(function(volume) {
                 if (mountStr != '') { mountStr += "</BR>"; }
-                if (volume["Name"]) { mountStr += volume["Name"]; } else { mountStr += volume["Source"]; }
-                if (mountStr.length > 32) { mountStr = mountStr.substring(0, 32) }
+                if (volume["Name"]) {
+                    mountStr += volume["Name"];
+                } else {
+                    var source = volume["Source"];
+                    if (source.length > 32) { source = source.substring(0, 32) }
+                    mountStr += source;
+                }
                 mountStr += "->" + volume["Destination"];
             });
             container["Mounts"] = mountStr;

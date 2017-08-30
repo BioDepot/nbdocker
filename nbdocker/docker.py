@@ -148,9 +148,13 @@ class DockerHandler(IPythonHandler):
         options = self.get_body_argument('options')
         options = json.loads(options)
         # passing docker.sock into container so that the container could access docker engine
-        volumes = {'/var/run/docker.sock': '/var/run/docker.sock',
-                   options['host']: options['container']}
-        ports = {int(options['internal']): int(options['external'])}
+        volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}
+        if options['host'] and options['container']:
+            volumes[options['host']] = options['container']
+
+        ports = {}
+        if options['internal'] and options['external']:
+            ports[int(options['internal'])] = int(options['external'])
 
         binds = []
         for s, d in volumes.items():
@@ -160,6 +164,7 @@ class DockerHandler(IPythonHandler):
         port_bindings = {}
         for i, e in ports.items():
             port_bindings[i] = e
+
         ports = list(ports.keys())
 
         host_config = self._docker.create_host_config(binds=binds, port_bindings=port_bindings)

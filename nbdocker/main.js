@@ -179,13 +179,12 @@ define([
             // format Volume Mounts to string
             container["Mounts"].forEach(function(volume) {
                 if (mountStr != '') { mountStr += "</BR>"; }
+                var source = volume["Source"];
                 if (volume["Name"]) {
-                    mountStr += volume["Name"];
-                } else {
-                    var source = volume["Source"];
-                    if (source.length > 32) { source = source.substring(0, 32) }
-                    mountStr += source;
+                    source = volume["Name"];
                 }
+                if (source.length > 32) { source = source.substring(0, 32) }
+                mountStr += source;
                 mountStr += "->" + volume["Destination"];
             });
             container["Mounts"] = mountStr;
@@ -209,7 +208,17 @@ define([
             if (bytes == 0) { return "0.00 B"; } 
             var e = Math.floor(Math.log(bytes) / Math.log(1024)); 
             return (bytes/Math.pow(1024, e)).toFixed(2)+" "+" KMGTP".charAt(e)+"iB";
-        }
+        };
+
+        SplitTag = function(RepoTag){
+            var tag_name = RepoTag
+            var tag_version = "<none>"
+            if(RepoTag.indexOf(":") != -1){
+                tag_name = RepoTag.split(":")[0];
+                tag_version = RepoTag.split(":")[1];
+            }
+            return [tag_name, tag_version]
+        };
     %>
     <table class="table table-hover" id="image_table">
         <thead>
@@ -230,8 +239,8 @@ define([
                         <i class="fa fa-plus" aria-hidden="true" image-id="<%= image["RepoTags"][0] %>"></i></a>
                     </td>
                     <td><%= image["Id"].substring(7,19) %></td>
-                    <td><%= image["RepoTags"][0].split(":")[0] %></td>
-                    <td><%= image["RepoTags"][0].split(":")[1] %></td>
+                    <td><%= SplitTag(image["RepoTags"][0])[0] %></td>
+                    <td><%= SplitTag(image["RepoTags"][0])[1] %></td>
                     <td><%= HumanSize(image["Size"]) %> </td>
                     <td><%= moment.unix(image["Created"]).format("YYYY-MM-DD HH:mm:ss") %></td>
                 </tr>

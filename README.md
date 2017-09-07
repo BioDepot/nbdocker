@@ -6,16 +6,17 @@ A Jupyter Notebook extension for Docker
 `docker pull biodepot/nbdocker`
 
 # Manually installation
+```shell
+git clone https://github.com/jmhoo/nbdocker.git
 
-`git clone https://github.com/jmhoo/nbdocker.git`
+pip install -e nbdocker --user
 
-`pip install -e nbdocker --user`
+jupyter serverextension enable --py --user nbdocker
 
-`jupyter serverextension enable --py --user nbdocker`
+jupyter nbextension install nbdocker/nbdocker --user
 
-`jupyter nbextension install nbdocker/nbdocker --user`
-
-`jupyter nbextension enable nbdocker/main --user`
+jupyter nbextension enable nbdocker/main --user
+```
 
 # Demo
 ![](nbdocker/nbdocker.gif)

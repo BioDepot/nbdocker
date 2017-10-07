@@ -6,7 +6,7 @@ A Jupyter Widget for Docker
 Installation
 ------------
 
-To install use pip(`not work now!`): 
+To install use pip(`not work now!`):
 
     $ pip install ipydocker
     $ jupyter nbextension enable --py --sys-prefix ipydocker
@@ -26,12 +26,14 @@ For a development installation (requires npm),
 
 Example
 ------------
-    from ipydocker.docker import DockerManager, DockerContainer
+    from ipydocker.docker import DockerManager
+    
+    from ipydocker.container import DockerContainer
 
     dw = DockerManager()
     dw
 
-    c = DockerContainer(image='biodepot/bwb', 
+    c = DockerContainer(image='biodepot/bwb',
                 volumes={"/Users/Jimmy/Downloads":"/data"},
                 ports={6080:6080},
                 commands=[])

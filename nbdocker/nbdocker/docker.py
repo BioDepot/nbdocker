@@ -152,6 +152,14 @@ class DockerHandler(IPythonHandler):
     def _event_create_container(self):
         options = self.get_body_argument('options')
         options = json.loads(options)
+
+        # save the notebook name and its commands to the dict
+        nb_name = options['notebookname']
+        if nbname_cmd_dict[nb_name]:
+            nbname_cmd_dict[nb_name].append(options)
+        else:
+            nbname_cmd_dict[nb_name] = [options]
+
         # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}
         if options['host'] and options['container']:
@@ -213,6 +221,37 @@ class DockerHandler(IPythonHandler):
         
         # create a new build instance and return uuid to client
         return {'uuid': g_docker_builder.new_build(image_name, docker_file)}
+
+    # Save the commands for a notebook by looking up the nbname_cmd_dict
+    def _save_cmd_history(self, nb_name):
+        if not nb_name or not nbname_cmd_dict[nb_name]:
+            return
+        else:
+            cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
+            cmds = nbname_cmd_dict[nb_name]
+            print("saving cmd history to: " + cmd_history_file)
+            with open(cmd_history_file, 'w') as f:
+                for item in cmds:
+                    f.write("%s\n" % json.dumps(item))
+
+    # Load cmd histories by notebook name
+    def load_histories(self, nb_name):
+        print("Loading cmd history for notebook name: " + nb_name)
+        if not nb_name:
+            return {'history': []}
+
+        cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
+        if not os.path.isfile(cmd_history_file):
+            print("cmd history file does not exist. " + cmd_history_file)
+            return {'history': []}
+
+        cmds = []
+        with open(cmd_history_file) as f:
+            for line in f:
+                j_content = json.loads(line)
+                cmds.append(j_content)
+
+        return {'history': cmds}
 
 
 class PullHandler(web.RequestHandler):

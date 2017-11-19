@@ -25,6 +25,11 @@ try:
 except:
     g_docker_ = None
 
+# global variables
+# notebook name and its docker commands history
+nbname_cmd_dict = {}
+# notebook working directory
+notebook_dir = ''
 
 class Build:
     def __init__(self, manager, uid, docker_cli, image_name, docker_file):
@@ -369,6 +374,15 @@ class BuildHandler(web.RequestHandler):
 
 
 def load_jupyter_server_extension(nb_app):
+    # debug info
+    nb_app.log.info("server info")
+    server_info = nb_app.server_info()
+    nb_app.log.info(server_info)
+
+    # get notebook working dir
+    notebook_dir = server_info['notebook_dir']
+    nb_app.log.info("Get the current directory: " + notebook_dir)
+
     web_app = nb_app.web_app
     host_pattern = '.*$'
     # register handlers

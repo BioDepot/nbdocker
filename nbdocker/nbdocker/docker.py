@@ -152,14 +152,6 @@ class DockerHandler(IPythonHandler):
     def _event_create_container(self):
         options = self.get_body_argument('options')
         options = json.loads(options)
-
-        # save the notebook name and its commands to the dict
-        nb_name = options['notebookname']
-        if nbname_cmd_dict[nb_name]:
-            nbname_cmd_dict[nb_name].append(options)
-        else:
-            nbname_cmd_dict[nb_name] = [options]
-
         # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}
         if options['host'] and options['container']:
@@ -193,6 +185,14 @@ class DockerHandler(IPythonHandler):
                                                      host_config=host_config)
 
         self._docker.start(_containerId)
+
+        # save the notebook name and its commands to the dict
+        nb_name = options['notebookname']
+        if nb_name in nbname_cmd_dict.keys():
+            nbname_cmd_dict[nb_name].append(options)
+        else:
+            nbname_cmd_dict[nb_name] = [options]
+
         return {'container_id': _containerId}
 
     def _event_remove_container(self):

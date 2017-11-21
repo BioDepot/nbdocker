@@ -25,6 +25,11 @@ try:
 except:
     g_docker_ = None
 
+# global variables
+# notebook name and its docker commands history
+nbname_cmd_dict = {}
+# notebook working directory
+notebook_dir = ''
 
 class Build:
     def __init__(self, manager, uid, docker_cli, image_name, docker_file):
@@ -180,6 +185,14 @@ class DockerHandler(IPythonHandler):
                                                      host_config=host_config)
 
         self._docker.start(_containerId)
+
+        # save the notebook name and its commands to the dict
+        nb_name = options['notebookname']
+        if nb_name in nbname_cmd_dict.keys():
+            nbname_cmd_dict[nb_name].append(options)
+        else:
+            nbname_cmd_dict[nb_name] = [options]
+
         return {'container_id': _containerId}
 
     def _event_remove_container(self):
@@ -208,6 +221,37 @@ class DockerHandler(IPythonHandler):
         
         # create a new build instance and return uuid to client
         return {'uuid': g_docker_builder.new_build(image_name, docker_file)}
+
+    # Save the commands for a notebook by looking up the nbname_cmd_dict
+    def _save_cmd_history(self, nb_name):
+        if not nb_name or not nbname_cmd_dict[nb_name]:
+            return
+        else:
+            cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
+            cmds = nbname_cmd_dict[nb_name]
+            print("saving cmd history to: " + cmd_history_file)
+            with open(cmd_history_file, 'w') as f:
+                for item in cmds:
+                    f.write("%s\n" % json.dumps(item))
+
+    # Load cmd histories by notebook name
+    def load_histories(self, nb_name):
+        print("Loading cmd history for notebook name: " + nb_name)
+        if not nb_name:
+            return {'history': []}
+
+        cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
+        if not os.path.isfile(cmd_history_file):
+            print("cmd history file does not exist. " + cmd_history_file)
+            return {'history': []}
+
+        cmds = []
+        with open(cmd_history_file) as f:
+            for line in f:
+                j_content = json.loads(line)
+                cmds.append(j_content)
+
+        return {'history': cmds}
 
 
 class PullHandler(web.RequestHandler):
@@ -369,6 +413,15 @@ class BuildHandler(web.RequestHandler):
 
 
 def load_jupyter_server_extension(nb_app):
+    # debug info
+    nb_app.log.info("server info")
+    server_info = nb_app.server_info()
+    nb_app.log.info(server_info)
+
+    # get notebook working dir
+    notebook_dir = server_info['notebook_dir']
+    nb_app.log.info("Get the current directory: " + notebook_dir)
+
     web_app = nb_app.web_app
     host_pattern = '.*$'
     # register handlers

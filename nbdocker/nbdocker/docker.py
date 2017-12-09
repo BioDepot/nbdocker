@@ -127,7 +127,11 @@ class DockerHandler(IPythonHandler):
             'listcontainer': self._event_list_containers,
             'createcontainer': self._event_create_container,
             'removecontainer': self._event_remove_container,
-            'buildsubmit': self._event_build_submit
+            'buildsubmit': self._event_build_submit,
+            'savehistory': self._event_save_history,
+            'listhistory': self._event_list_history,
+            'removehistory': self._event_remove_history,
+            'rereunhistory': self._event_rerun_history,
         }
         cmd = self.get_body_argument('cmd')
 
@@ -152,6 +156,23 @@ class DockerHandler(IPythonHandler):
     def _event_create_container(self):
         options = self.get_body_argument('options')
         options = json.loads(options)
+        
+        _containerId = self._create_container(options)
+
+        # save the notebook name and its commands to the dict
+        nb_name = options['notebookname']
+        nb_name, _ = os.path.splitext(nb_name)
+        options['notebookname'] = nb_name
+        if nb_name in nbname_cmd_dict:
+            options['Id'] = len(nbname_cmd_dict[nb_name])
+            nbname_cmd_dict[nb_name].append(options)
+        else:
+            options['Id'] = 0;
+            nbname_cmd_dict[nb_name] = [options]
+
+        return {'container_id': _containerId}
+
+    def _create_container(self, options):
         # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}
         if options['host'] and options['container']:
@@ -183,17 +204,8 @@ class DockerHandler(IPythonHandler):
                                                      ports=ports,
                                                      command=commands,
                                                      host_config=host_config)
-
         self._docker.start(_containerId)
-
-        # save the notebook name and its commands to the dict
-        nb_name = options['notebookname']
-        if nb_name in nbname_cmd_dict.keys():
-            nbname_cmd_dict[nb_name].append(options)
-        else:
-            nbname_cmd_dict[nb_name] = [options]
-
-        return {'container_id': _containerId}
+        return _containerId
 
     def _event_remove_container(self):
         container_id = self.get_body_argument('container_id')
@@ -203,7 +215,7 @@ class DockerHandler(IPythonHandler):
             self._docker.remove_container(container_id, force=True)
         except:
             pass
-    
+
     def _event_build_submit(self):
         image_name = self.get_body_argument('image_name')
         docker_file = self.get_body_argument('docker_file')
@@ -223,9 +235,14 @@ class DockerHandler(IPythonHandler):
         return {'uuid': g_docker_builder.new_build(image_name, docker_file)}
 
     # Save the commands for a notebook by looking up the nbname_cmd_dict
-    def _save_cmd_history(self, nb_name):
-        if not nb_name or not nbname_cmd_dict[nb_name]:
-            return
+    def _event_save_history(self):
+        nb_name = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_name)
+
+        self.log.info("nbdocker saving {} history".format(nb_name))
+
+        if not nb_name or nb_name not in nbname_cmd_dict:
+            return {'message': 'No history!'}
         else:
             cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
             cmds = nbname_cmd_dict[nb_name]
@@ -234,25 +251,60 @@ class DockerHandler(IPythonHandler):
                 for item in cmds:
                     f.write("%s\n" % json.dumps(item))
 
+            return {'message': 'History saved!'}
+
     # Load cmd histories by notebook name
-    def load_histories(self, nb_name):
-        print("Loading cmd history for notebook name: " + nb_name)
+    def _event_list_history(self):
+        nb_name = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_name)
+
+        self.log.info("Loading history for notebook: " + nb_name)
         if not nb_name:
             return {'history': []}
 
-        cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
-        if not os.path.isfile(cmd_history_file):
-            print("cmd history file does not exist. " + cmd_history_file)
-            return {'history': []}
+        if nb_name not in nbname_cmd_dict:
+            cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
+            if not os.path.isfile(cmd_history_file):
+                print("cmd history file does not exist. " + cmd_history_file)
+                return {'history': []}
 
-        cmds = []
-        with open(cmd_history_file) as f:
-            for line in f:
-                j_content = json.loads(line)
-                cmds.append(j_content)
+            cmds = []
+            with open(cmd_history_file) as f:
+                for line in f:
+                    j_content = json.loads(line)
+                    cmds.append(j_content)
+                
+                nbname_cmd_dict[nb_name] = cmds
 
-        return {'history': cmds}
+        return {'history': nbname_cmd_dict[nb_name]}
 
+
+    def _event_remove_history(self):
+        nb_name = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_name)
+        record_id = self.get_body_argument('record_id')
+        if nb_name in nbname_cmd_dict:
+            nbname_cmd_dict[nb_name][:] = [record for record in nbname_cmd_dict[nb_name] if str(record['Id']) != record_id]
+        self.log.info(nbname_cmd_dict[nb_name])
+
+    def _event_rerun_history(self):
+        nb_name = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_name)
+        record_id = self.get_body_argument('record_id')
+
+        record = None
+        for r in nbname_cmd_dict[nb_name]:
+            self.log.info(r["Id"])
+            if str(r["Id"]) == record_id:
+                record = r
+                break
+
+        self.log.info(record)
+        _containerId = ""
+        if record:
+            _containerId = self._create_container(record)
+
+        return _containerId
 
 class PullHandler(web.RequestHandler):
     @gen.coroutine

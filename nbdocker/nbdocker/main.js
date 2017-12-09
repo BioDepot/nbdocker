@@ -111,6 +111,7 @@ define([
         <li class="active"><a data-toggle="tab" href="#Containers" id="showContainers">Containers</a></li>
         <li><a data-toggle="tab" href="#Images" id="showImages">Images</a></li>
         <li><a data-toggle="tab" href="#Build">Build</a></li>
+        <li><a data-toggle="tab" href="#HistoryView" id="showHistories">History</a></li>
     </ul>
 
     <div class="tab-content">
@@ -142,6 +143,16 @@ define([
                         <span class="fa fa-history" aria-hidden="true"> logs</span>
                     </button>
                 </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="HistoryView">
+            <div class="col-sm-12">
+                <button class="btn btn-default btn-primary" type="button" id="saveHistory">
+                    <span class="fa fa-floppy-o"> Save</span>
+                </button>
+            </div>
+            <div id="History">
+                <p>Loading...</p>
             </div>
         </div>
     </div>
@@ -252,6 +263,46 @@ define([
         return _.template(template_images)({ images: images });
     };
 
+    /*
+    "host": $(this).find('#host_dir').val(),
+                            "container": $(this).find('#container_dir').val(),
+                            "external": $(this).find('#external_port').val(),
+                            "internal": $(this).find('#internal_port').val(),
+                            "command": $(this).find('#container_command').val(),
+                            "image": image_name,
+    */
+    var template_history = `
+    <table class="table table-striped table-hover">
+        <thead><tr>
+        <th width=11%>#</th>
+        <th width=25%>Image</th>
+        <th width=64%>Others</th>
+        </tr></thead>
+    <tbody>
+    <% _.each(histories, function(record){ %>
+        <tr>
+        <td>
+            <a class="btn remove_record" href="javascript:void(0)" record-id="<%= record["Id"] %>">
+            <i class="fa fa-trash" aria-hidden="true" record-id="<%= record["Id"] %>"></i></a>
+            <a class="btn rerun_record" href="javascript:void(0)" record-id="<%= record["Id"] %>">
+            <i class="fa fa-play" aria-hidden="true" record-id="<%= record["Id"] %>"></i></a>
+        </td>
+        <td><%= record["image"] %></td>
+        <td><%= record["Mounts"]%><br/><%= record["Ports"] %><br/><%= record["command"]%></td>
+        </tr>
+    <% }); %>
+    </tbody>
+    </table>`;
+    var ListHistories = function(histories) {
+        console.log(histories);
+        histories.forEach(function(record) {
+            record["Mounts"] = record["host"] + "->" + record["container"];
+            record["Ports"] = record["external"] + ":" + record["internal"];
+        });
+
+        return _.template(template_history)({ histories: histories });
+    }
+
     var CreateContainer = function(image_name, fn_ready_create) {
         var create_container_template = `
             <div class="panel panel-info">
@@ -358,6 +409,8 @@ define([
 
             // ajax request to create container
             function create_container(options) {
+                options["notebookname"] = IPython.notebook.notebook_path;
+                console.log(options);
                 var docker_create_container = {
                     type: "POST",
                     data: { cmd: "createcontainer", options: JSON.stringify(options) },
@@ -384,6 +437,31 @@ define([
                     }
                 };
                 ajax(service_url, docker_remove_container);
+            };
+
+            // request to remove history
+            function remove_history(record_id) {
+                var docker_remove_history = {
+                    type: "POST",
+                    data: { cmd: "removehistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
+                    success: function(data, status) {
+                        ajax(service_url, docker_list_histories);
+                    }
+                };
+                ajax(service_url, docker_remove_history);
+            };
+
+            // request to rerun history
+            function rerun_history(record_id) {
+                var docker_rerun_history = {
+                    type: "POST",
+                    data: { cmd: "rereunhistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
+                    success: function(data, status) {
+                        $('#showContainers').tab('show');
+                        ajax(service_url, docker_list_container);
+                    }
+                };
+                ajax(service_url, docker_rerun_history);
             };
 
             // ajax requst to submit a building
@@ -428,6 +506,22 @@ define([
                     }
                 });
                 builder.fetch();
+            };
+
+            // request to save histories
+            function on_save_history() {
+                var docker_save_history = {
+                    type: "POST",
+                    data: { cmd: "savehistory", notebook_name: IPython.notebook.notebook_path },
+                    success: function(data, status) {
+                        console.log(data["message"]);
+                    },
+                    error: function(jqXHR, status, err) {
+                        alert("save histories failed: " + err);
+                    }
+                };
+
+                ajax(service_url, docker_save_history);
             };
 
             // ajax request to retrieve docker info
@@ -479,6 +573,26 @@ define([
                 }
             };
 
+            // ajax request to list histories
+            var docker_list_histories = {
+                type: "POST",
+                data: { cmd: "listhistory", notebook_name: IPython.notebook.notebook_path },
+                success: function(data, status) {
+                    $('#History').html(ListHistories(data['history']));
+                    $('tr a.remove_record').on('click', function(e) {
+                        var record_id = $(e.target).attr('record-id');
+                        remove_history(record_id);
+                    });
+                    $('tr a.rerun_record').on('click', function(e) {
+                        var record_id = $(e.target).attr('record-id');
+                        rerun_history(record_id);
+                    });
+                },
+                error: function(jqXHR, status, err) {
+                    alert("list history failed: " + err);
+                }
+            };
+
             // MAIN dialog
             var dockerDialog = dialog.modal({
                 body: div,
@@ -487,7 +601,7 @@ define([
                     'Close': {
                         class: 'btn-primary btn-large',
                         click: on_ok
-                    }
+                    },
                 },
                 notebook: env.notebook,
                 keyboard_manager: env.notebook.keyboard_manager,
@@ -502,6 +616,9 @@ define([
                     });
                     $('#showImages').on('click', function() {
                         ajax(service_url, docker_list_images);
+                    });
+                    $('#showHistories').on('click', function() {
+                        ajax(service_url, docker_list_histories);
                     });
 
                     ajax(service_url, docker_list_container);
@@ -601,6 +718,12 @@ define([
                             $('#build_left').show();
                         }
                     });
+
+                    $('#saveHistory').on('click', function() {
+                        on_save_history();
+                    });
+
+                    //console.log(IPython.notebook.notebook_path);
                 }
             });
             dockerDialog.find(".modal-content").attr('style', 'width: 900px');

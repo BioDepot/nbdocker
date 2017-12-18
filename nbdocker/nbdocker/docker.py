@@ -236,48 +236,44 @@ class DockerHandler(IPythonHandler):
 
     # Save the commands for a notebook by looking up the nbname_cmd_dict
     def _event_save_history(self):
-        nb_name = self.get_body_argument('notebook_name')
-        nb_name, _ = os.path.splitext(nb_name)
+        nb_path = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_path)
 
         self.log.info("nbdocker saving {} history".format(nb_name))
 
         if not nb_name or nb_name not in nbname_cmd_dict:
             return {'message': 'No history!'}
         else:
-            cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
             cmds = nbname_cmd_dict[nb_name]
-            print("saving cmd history to: " + cmd_history_file)
-            with open(cmd_history_file, 'w') as f:
-                for item in cmds:
-                    f.write("%s\n" % json.dumps(item))
+            print("saving cmd history to: " + nb_path)
+            with open(nb_path) as data_file:
+                data = json.load(data_file)
+            data["metadata"]["cmd_history"] = cmds 
+            with open(nb_path, 'w') as f:
+                json.dump(data, f)
 
             return {'message': 'History saved!'}
 
     # Load cmd histories by notebook name
     def _event_list_history(self):
-        nb_name = self.get_body_argument('notebook_name')
-        nb_name, _ = os.path.splitext(nb_name)
+        nb_path = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_path)
 
         self.log.info("Loading history for notebook: " + nb_name)
         if not nb_name:
             return {'history': []}
 
         if nb_name not in nbname_cmd_dict:
-            cmd_history_file = os.path.join(notebook_dir, nb_name + '.json')
-            if not os.path.isfile(cmd_history_file):
-                print("cmd history file does not exist. " + cmd_history_file)
-                return {'history': []}
-
+            print("there is no cmd history in nb_name_cmd_dict, look it up from ipynb file metadata")
             cmds = []
-            with open(cmd_history_file) as f:
-                for line in f:
-                    j_content = json.loads(line)
-                    cmds.append(j_content)
+            with open(nb_path) as f:
+                data = json.load(f)
+            if "cmd_history" in data["metadata"]:
+                nbname_cmd_dict[nb_name] = data["metadata"]["cmd_history"]
+            else:
+                nbname_cmd_dict[nb_name] = []
                 
-                nbname_cmd_dict[nb_name] = cmds
-
         return {'history': nbname_cmd_dict[nb_name]}
-
 
     def _event_remove_history(self):
         nb_name = self.get_body_argument('notebook_name')

@@ -264,7 +264,7 @@ class DockerHandler(IPythonHandler):
             return {'history': []}
 
         if nb_name not in nbname_cmd_dict:
-            print("there is no cmd history in nb_name_cmd_dict, look it up from ipynb file metadata")
+            self.log.info("Loading history from notebook's metadata")
             cmds = []
             with open(nb_path) as f:
                 data = json.load(f)

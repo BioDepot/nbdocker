@@ -3,12 +3,15 @@ define([
     'base/js/namespace',
     'base/js/dialog',
     'base/js/utils',
+    'base/js/events',
+    'notebook/js/cell',
+    'notebook/js/textcell',
     'jquery',
     './progressbar',
     './xterm.js-2.9.2/xterm',
     './xterm.js-2.9.2/addons/fit/fit',
     './notify'
-], function(require, IPython, dialog, utils, $, ProgressBar, Terminal, fitAddon) {
+], function(require, IPython, dialog, utils, events, cell, textcell, $, ProgressBar, Terminal, fitAddon) {
 
     // Object for retrieve pull message
     function PullImage(image_name, image_version) {
@@ -587,6 +590,9 @@ define([
                         var record_id = $(e.target).attr('record-id');
                         rerun_history(record_id);
                     });
+                    if (data['history'].length > 0) {
+                        $('.nav-tabs a[href="#HistoryView"]').tab('show');
+                    }
                 },
                 error: function(jqXHR, status, err) {
                     alert("list history failed: " + err);
@@ -622,6 +628,7 @@ define([
                     });
 
                     ajax(service_url, docker_list_container);
+                    ajax(service_url, docker_list_histories);
 
                     // progress bar instance for pulling image
                     var bar = new ProgressBar.Line('#progress_container', {
@@ -722,24 +729,85 @@ define([
                     $('#saveHistory').on('click', function() {
                         on_save_history();
                     });
-
-                    //console.log(IPython.notebook.notebook_path);
                 }
             });
             dockerDialog.find(".modal-content").attr('style', 'width: 900px');
         }
     }
 
+    var render_cell = function(cell) {
+        var element = cell.element.find('div.text_cell_render');
+        var text = render_nbdocker(cell, element[0].innerHTML);
+        if (text !== undefined) {
+            element[0].innerHTML = text;
+        }
+    };
+
+    /* force rendering of markdown cell if notebook is dirty */
+    var original_render = textcell.MarkdownCell.prototype.render;
+    textcell.MarkdownCell.prototype.render = function() {
+        if (IPython.notebook.dirty === true) {
+            this.rendered = false
+        }
+        console.log("nbdocker redirect render!")
+        return original_render.apply(this)
+    };
+
+    var show_nbdocker = function() {
+        IPython.notebook.keyboard_manager.actions.call('jupyter-docker:manager');
+    };
+
+    var render_nbdocker = function(cell, text) {
+        var nbdocker_button =
+            `<button class="btn btn-default" onclick="IPython.notebook.keyboard_manager.actions.call('jupyter-docker:manager');">
+            <i class="docker-icon fa"></i>
+            </button>`;
+        var found = false;
+        var newtext = text.replace(/{(.*?)}/g, function(match, tag, cha) {
+            found = true;
+            if (tag === "nbdocker") return nbdocker_button;
+        });
+
+        if (found == true) return newtext;
+        return undefined
+    };
+
+    var update_md_cells = function() {
+        var ncells = IPython.notebook.ncells();
+        var cells = IPython.notebook.get_cells();
+        for (var i = 0; i < ncells; i++) {
+            var cell = cells[i];
+            if (cell.cell_type == 'markdown') {
+                render_cell(cell);
+            }
+        }
+    };
+
+
     function load_ipython_extension() {
         load_css('./main.css');
         load_css('./xterm.js-2.9.2/xterm.css');
         // log to console
-        console.info('Loaded Jupyter extension: Docker for Jupter Notebook');
+        console.info('Loaded Jupyter extension: nbdocker -- Docker for Jupter Notebook');
 
         // register new action
         var action_name = IPython.keyboard_manager.actions.register(docker_widget, 'manager', 'jupyter-docker');
         // add button to toolbar
         IPython.toolbar.add_buttons_group(['jupyter-docker:manager']);
+
+        events.on("rendered.MarkdownCell", function(event, data) {
+            render_cell(data.cell);
+        });
+
+        events.on("kernel_ready.Kernel", function() {
+            if (Jupyter.notebook !== undefined && Jupyter.notebook._fully_loaded) {
+                update_md_cells();
+            }
+        });
+
+        events.on("notebook_loaded.Notebook", function() {
+            update_md_cells();
+        });
 
     }
 

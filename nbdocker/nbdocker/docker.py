@@ -7,6 +7,7 @@ import requests
 import tempfile
 import uuid
 import shutil
+import time
 import docker
 from queue import Queue, Empty
 from notebook.utils import url_path_join
@@ -82,6 +83,61 @@ class Build:
         self.q.put_nowait({'kind': kind, 'payload': obj})
 
 
+class RunShcheduler:
+    def __init__(self, docker_cli, nb_name):
+        self._docker = docker_cli
+        self._nb_name = nb_name
+        self.q = Queue()
+        self._task_status = {}
+        self._thread = None
+
+    def runner(self):
+        while True:
+            try:
+                record_id = self.q.get_nowait()
+            except Empty:
+                yield gen.sleep(2)
+                continue
+            
+            container_option = None
+            for r in nbname_cmd_dict[self._nb_name]:
+                if str(r["Id"]) == record_id:
+                    container_option = r
+                    break
+            
+            self._task_status[record_id] = 'running'
+
+            container_id = None
+            if container_option:
+                container_id = self._docker._create_container(container_option)
+
+                while self._docker.is_container_running(container_id):
+                    time.sleep(2)
+                self._docker.remove_container(container_id)
+
+            self.q.task_done()
+            self._task_status[record_id] = 'completed'
+
+
+    def start(self):
+        self._thread = threading.Thread(target=self.runner)
+        self._thread.start()
+
+    def add_task(self, record_id):
+        self.q.put_nowait(record_id)
+        self._task_status[record_id] = 'waiting'
+        
+class RunSchedulerManager(object):
+    def __init__(self):
+        pass
+
+    def get_runner(self, nb_name):
+        pass
+
+    def new_scheduler(self, nb_name):
+        pass
+
+
 class BuildManager(object):
     def __init__(self):
         self.builds = {}
@@ -119,6 +175,25 @@ class DockerHandler(IPythonHandler):
             self._docker = docker.APIClient(base_url='npipe:////./pipe/docker_engine')
         else:
             self._docker = docker.APIClient(base_url='unix:///var/run/docker.sock')
+
+
+    def _locate_user_data(self):
+        container_id = os.environ['HOSTNAME']
+        user_volume = None
+        for c in self._docker.containers(all=False):
+            c_id = c['Id']
+            if len(c_id) < 12:
+                continue
+
+            if c_id[:12] == container_id:
+                for m in c['Mounts']:
+                    if m['Type'] == 'volume' and 'jupyterhub-user-' in m['Name']:
+                        user_volume = m['Name']
+                        break
+                    elif m['Type'] == 'bind' and '/home/jovyan/work' in m['Destination']:
+                        user_volume = m['Source']
+
+        return user_volume
 
     def post(self):
         dispatch_table = {
@@ -178,6 +253,10 @@ class DockerHandler(IPythonHandler):
         if options['host'] and options['container']:
             volumes[options['host']] = options['container']
 
+        jupyter_user_volume = self._locate_user_data()
+        if jupyter_user_volume:
+            volumes[jupyter_user_volume] = '/jupyterdata'
+
         ports = {}
         if options['internal'] and options['external']:
             ports[int(options['internal'])] = int(options['external'])
@@ -207,12 +286,21 @@ class DockerHandler(IPythonHandler):
         self._docker.start(_containerId)
         return _containerId
 
+    def is_container_running(self, container_id):
+        for container in self._docker.containers(all=False):
+            if container['Id'] == container_id:
+                return True
+        return False
+
+    def remove_container(self, container_id, force=False):
+        self._docker.remove_container(container_id, force=force)
+
     def _event_remove_container(self):
         container_id = self.get_body_argument('container_id')
 
         self._docker.stop(container_id)
         try:
-            self._docker.remove_container(container_id, force=True)
+            self.remove_container(container_id, force=True)
         except:
             pass
 

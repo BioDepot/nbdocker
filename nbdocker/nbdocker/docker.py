@@ -178,20 +178,22 @@ class DockerHandler(IPythonHandler):
 
 
     def _locate_user_data(self):
-        container_id = os.environ['HOSTNAME']
         user_volume = None
-        for c in self._docker.containers(all=False):
-            c_id = c['Id']
-            if len(c_id) < 12:
-                continue
 
-            if c_id[:12] == container_id:
-                for m in c['Mounts']:
-                    if m['Type'] == 'volume' and 'jupyterhub-user-' in m['Name']:
-                        user_volume = m['Name']
-                        break
-                    elif m['Type'] == 'bind' and '/home/jovyan/work' in m['Destination']:
-                        user_volume = m['Source']
+        if 'HOSTNAME' in os.environ:
+            container_id = os.environ['HOSTNAME']
+            for c in self._docker.containers(all=False):
+                c_id = c['Id']
+                if len(c_id) < 12:
+                    continue
+
+                if c_id[:12] == container_id:
+                    for m in c['Mounts']:
+                        if m['Type'] == 'volume' and 'jupyterhub-user-' in m['Name']:
+                            user_volume = m['Name']
+                            break
+                        elif m['Type'] == 'bind' and '/home/jovyan/work' in m['Destination']:
+                            user_volume = m['Source']
 
         return user_volume
 
@@ -207,6 +209,7 @@ class DockerHandler(IPythonHandler):
             'listhistory': self._event_list_history,
             'removehistory': self._event_remove_history,
             'rereunhistory': self._event_rerun_history,
+            'gethistory': self._event_get_history,
         }
         cmd = self.get_body_argument('cmd')
 
@@ -341,6 +344,17 @@ class DockerHandler(IPythonHandler):
                 json.dump(data, f)
 
             return {'message': 'History saved!'}
+    
+    def _loading_history(self, nb_path, nb_name):
+        if nb_name not in nbname_cmd_dict:
+            self.log.info("Loading history from notebook's metadata")
+            cmds = []
+            with open(nb_path) as f:
+                data = json.load(f)
+            if "cmd_history" in data["metadata"]:
+                nbname_cmd_dict[nb_name] = data["metadata"]["cmd_history"]
+            else:
+                nbname_cmd_dict[nb_name] = []
 
     # Load cmd histories by notebook name
     def _event_list_history(self):
@@ -351,15 +365,7 @@ class DockerHandler(IPythonHandler):
         if not nb_name:
             return {'history': []}
 
-        if nb_name not in nbname_cmd_dict:
-            self.log.info("Loading history from notebook's metadata")
-            cmds = []
-            with open(nb_path) as f:
-                data = json.load(f)
-            if "cmd_history" in data["metadata"]:
-                nbname_cmd_dict[nb_name] = data["metadata"]["cmd_history"]
-            else:
-                nbname_cmd_dict[nb_name] = []
+        self._loading_history(nb_path, nb_name)
                 
         return {'history': nbname_cmd_dict[nb_name]}
 
@@ -383,12 +389,26 @@ class DockerHandler(IPythonHandler):
                 record = r
                 break
 
-        self.log.info(record)
         _containerId = ""
         if record:
             _containerId = self._create_container(record)
 
         return _containerId
+
+    def _event_get_history(self):
+        nb_path = self.get_body_argument('notebook_name')
+        nb_name, _ = os.path.splitext(nb_path)
+        record_id = self.get_body_argument('record_id')
+
+        self._loading_history(nb_path, nb_name)
+
+        record = None
+        for r in nbname_cmd_dict[nb_name]:
+            if str(r["Id"]) == record_id:
+                record = r
+                break
+        
+        return {'history': record}
 
 class PullHandler(web.RequestHandler):
     @gen.coroutine

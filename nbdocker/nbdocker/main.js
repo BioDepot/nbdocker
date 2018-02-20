@@ -88,6 +88,7 @@ define([
         disableStdin: true
     });
 
+
     var template_tab = `
     <div class="col-sm-12" style="margin-bottom: 4px;">
         <div class="col-sm-7 row">
@@ -391,7 +392,7 @@ define([
             body: elements,
             buttons: {
                 "Cancel": {},
-                Remove: {
+                "Remove": {
                     label: '<i class="fa fa-trash"></i> Remove',
                     class: "btn-danger",
                     click: fn_confirmed(container_id)
@@ -753,19 +754,19 @@ define([
         return original_render.apply(this)
     };
 
-    var show_nbdocker = function() {
-        IPython.notebook.keyboard_manager.actions.call('jupyter-docker:manager');
-    };
-
     var render_nbdocker = function(cell, text) {
         var nbdocker_button =
-            `<button class="btn btn-default" onclick="IPython.notebook.keyboard_manager.actions.call('jupyter-docker:manager');">
+            `<button class="btn btn-default" onclick="IPython.notebook.events.trigger('nbdocker.run', '#nbdocker_his_id#')">
             <i class="docker-icon fa"></i>
             </button>`;
         var found = false;
         var newtext = text.replace(/{(.*?)}/g, function(match, tag, cha) {
             found = true;
-            if (tag === "nbdocker") return nbdocker_button;
+            //console.log(tag);
+            if (tag.indexOf("nbdocker") >= 0) {
+                return nbdocker_button.replace("#nbdocker_his_id#", tag);
+            }
+            //if (tag === "nbdocker") return nbdocker_button;
         });
 
         if (found == true) return newtext;
@@ -783,6 +784,58 @@ define([
         }
     };
 
+
+    var dlgConfirmRunContainer = function(record_id, record_info, fn_run_history) {
+        var elements = $('<div/>').append(
+            $("<p/>").html('<p class="bootbox-body">You are going to run history <b>#' + record_id.toString() + '</b>: </p><p style="text-indent: 10px;">' + record_info + "</p>"));
+
+        var dlg_run_history = dialog.modal({
+            title: "Run container from history #" + record_id.toString(),
+            body: elements,
+            buttons: {
+                "Cancel": {},
+                "Run": {
+                    label: '<i class="fa fa-play"></i> Run',
+                    class: "btn-primary",
+                    click: function() {
+                        fn_run_history(record_id)
+                    }
+                }
+            }
+        });
+    };
+
+    function run_history_quiet(record_id) {
+        var docker_run_history_quiet = {
+            type: "POST",
+            data: { cmd: "rereunhistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
+            success: function(data, status) {}
+        };
+        console.log('Runing history #' + record_id);
+        ajax(service_url, docker_run_history_quiet);
+    };
+
+    function OnRunHistory(event, record_id) {
+        record_id = record_id.split("#")[1];
+        console.log('run history record id:' + record_id);
+
+        var docker_get_history = {
+            type: "POST",
+            data: { cmd: "gethistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
+            success: function(data, status) {}
+        };
+
+        $.when(ajax(service_url, docker_get_history)).done(function(response) {
+            const max_cmd_length = 30;
+
+            record_detail = response['history'];
+            command = record_detail['command'].substring(0, max_cmd_length);
+            record_info = "Image: " + record_detail['image'] + "</br>" + "Commands: " + command;
+
+            dlgConfirmRunContainer(record_id, record_info, run_history_quiet);
+        });
+
+    };
 
     function load_ipython_extension() {
         load_css('./main.css');
@@ -807,6 +860,10 @@ define([
 
         events.on("notebook_loaded.Notebook", function() {
             update_md_cells();
+        });
+
+        events.on("nbdocker.run", function(event, data) {
+            OnRunHistory(event, data);
         });
 
     }

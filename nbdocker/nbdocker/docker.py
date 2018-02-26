@@ -210,6 +210,7 @@ class DockerHandler(IPythonHandler):
             'removehistory': self._event_remove_history,
             'rereunhistory': self._event_rerun_history,
             'gethistory': self._event_get_history,
+            'containerstatus': self._event_container_status,
         }
         cmd = self.get_body_argument('cmd')
 
@@ -393,7 +394,7 @@ class DockerHandler(IPythonHandler):
         if record:
             _containerId = self._create_container(record)
 
-        return _containerId
+        return {'container_id': _containerId }
 
     def _event_get_history(self):
         nb_path = self.get_body_argument('notebook_name')
@@ -409,6 +410,32 @@ class DockerHandler(IPythonHandler):
                 break
         
         return {'history': record}
+
+    def _event_container_status(self):
+        data = self.get_body_argument('containers')
+        containers = json.loads(data)
+
+        for key in containers:
+            c_front = containers[key]
+            c = self._locate_container(c_front['id'], all=True)
+            if c:
+                #self.log.info(c)
+                c_front['status'] = c['Status']
+
+        return {'containers': containers}
+
+    def _locate_container(self, container_id, all=False):
+        for c in self._docker.containers(all=all):
+            c_id = c['Id']
+            if len(c_id) < 12:
+                continue
+            
+            c_id = c_id[:12]
+            if c_id == container_id:
+                return c
+        return None
+
+
 
 class PullHandler(web.RequestHandler):
     @gen.coroutine

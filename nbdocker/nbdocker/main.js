@@ -6,12 +6,13 @@ define([
     'base/js/events',
     'notebook/js/cell',
     'notebook/js/textcell',
+    'notebook/js/codecell',
     'jquery',
     './progressbar',
     './xterm.js-2.9.2/xterm',
     './xterm.js-2.9.2/addons/fit/fit',
     './notify'
-], function(require, IPython, dialog, utils, events, cell, textcell, $, ProgressBar, Terminal, fitAddon) {
+], function(require, IPython, dialog, utils, events, cell, textcell, codecell, $, ProgressBar, Terminal, fitAddon) {
 
     // Object for retrieve pull message
     function PullImage(image_name, image_version) {
@@ -756,7 +757,7 @@ define([
 
     var render_nbdocker = function(cell, text) {
         var nbdocker_button =
-            `<button class="btn btn-default" onclick="IPython.notebook.events.trigger('nbdocker.run', '#nbdocker_his_id#')">
+            `<button class="btn btn-default" onclick="IPython.notebook.events.trigger('nbdocker.run', {'record_id': '#{nbdocker_his_id}', 'cell_id': '#{cell_id}'})">
             <i class="docker-icon fa"></i>
             </button>`;
         var found = false;
@@ -764,12 +765,19 @@ define([
             found = true;
             //console.log(tag);
             if (tag.indexOf("nbdocker") >= 0) {
-                return nbdocker_button.replace("#nbdocker_his_id#", tag);
+                //if (cell.metadata.DockerContainers === undefined)
+                cell.metadata.DockerContainers = {}
+
+                return nbdocker_button.replace("#{nbdocker_his_id}", tag).replace("#{cell_id}", cell.cell_id);
             }
             //if (tag === "nbdocker") return nbdocker_button;
         });
 
-        if (found == true) return newtext;
+        if (found)
+            return newtext;
+
+        clear_docker_run_status([cell]);
+
         return undefined
     };
 
@@ -785,7 +793,7 @@ define([
     };
 
 
-    var dlgConfirmRunContainer = function(record_id, record_info, fn_run_history) {
+    var dlgConfirmRunContainer = function(record_id, record_info, cell, fn_run_history) {
         var elements = $('<div/>').append(
             $("<p/>").html('<p class="bootbox-body">You are going to run history <b>#' + record_id.toString() + '</b>: </p><p style="text-indent: 10px;">' + record_info + "</p>"));
 
@@ -798,27 +806,49 @@ define([
                     label: '<i class="fa fa-play"></i> Run',
                     class: "btn-primary",
                     click: function() {
-                        fn_run_history(record_id)
+                        fn_run_history(record_id, cell);
                     }
                 }
             }
         });
     };
 
-    function run_history_quiet(record_id) {
+    function run_history_quiet(record_id, cell) {
         var docker_run_history_quiet = {
             type: "POST",
             data: { cmd: "rereunhistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
-            success: function(data, status) {}
+            success: function(data, status) {
+                var container = {
+                    "id": data['container_id']['Id'].substring(0, 12),
+                    "status": 'running...'
+                };
+
+                cell.metadata.DockerContainers[record_id.toString()] = container;
+                update_docker_run_area(cell);
+            }
         };
         console.log('Runing history #' + record_id);
         ajax(service_url, docker_run_history_quiet);
     };
 
-    function OnRunHistory(event, record_id) {
-        record_id = record_id.split("#")[1];
+    function locate_cell(cell_id) {
+        var cells = IPython.notebook.get_cells();
+        for (var i = 0; i < cells.length; i++) {
+            var cell = cells[i];
+
+            if ((cell.cell_type === 'markdown') && cell.cell_id === cell_id) {
+                return cell;
+            }
+        }
+        return undefined
+    }
+
+    function OnRunHistory(event, data) {
+        cell_id = data['cell_id'];
+        record_id = data['record_id'].split("#")[1];
         console.log('run history record id:' + record_id);
 
+        cell = locate_cell(cell_id);
         var docker_get_history = {
             type: "POST",
             data: { cmd: "gethistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
@@ -832,10 +862,82 @@ define([
             command = record_detail['command'].substring(0, max_cmd_length);
             record_info = "Image: " + record_detail['image'] + "</br>" + "Commands: " + command;
 
-            dlgConfirmRunContainer(record_id, record_info, run_history_quiet);
+            dlgConfirmRunContainer(record_id, record_info, cell, run_history_quiet);
         });
 
     };
+
+    function OnRefreshCellContainer(event, info) {
+        cell_id = info['cell_id'];
+
+        cell = locate_cell(cell_id);
+
+        var docker_get_container_status = {
+            type: "POST",
+            data: { cmd: "containerstatus", containers: JSON.stringify(cell.metadata.DockerContainers) },
+            success: function(data, status) {
+                cell.metadata.DockerContainers = data['containers'];
+                update_docker_run_area(cell);
+            }
+        };
+        ajax(service_url, docker_get_container_status);
+
+    }
+    // Runing status indicator
+
+    function clear_docker_run_status(cells) {
+        cells.forEach(function(cell, idx, arr) {
+            delete cell.metadata.DockerContainers;
+            cell.element.find('.message_area').remove();
+        });
+        events.trigger('set_dirty.Notebook', { value: true });
+    }
+
+    function clear_docker_run_status_all() {
+        clear_docker_run_status(Jupyter.notebook.get_cells());
+    }
+
+    function update_docker_run_area(cell) {
+        if (!(cell.cell_type === 'markdown') || !cell.metadata.DockerContainers) {
+            return $();
+        }
+
+        var docker_area = cell.element.find('.message_area');
+        if (docker_area.length < 1) {
+            var refresh_button = `
+            <div> 
+            <button class='btn btn-sm' id='refresh' onclick="IPython.notebook.events.trigger('nbdocker.refresh', {'cell_id': '#{cell_id}'})">
+                <i class='fa fa-refresh' aria-hidden='true'></i>
+            </button>
+            </div>`;
+            refresh_button = refresh_button.replace("#{cell_id}", cell.cell_id);
+
+            docker_area = $('<div/>')
+                .addClass('message_area')
+                .append($('<div/>').html(refresh_button))
+                .append($('<div/>').addClass('container_info'))
+                .appendTo(cell.element.find('.text_cell_render'));
+        }
+
+        var docker_subarea = cell.element.find('.container_info');
+
+        var container_html = "";
+        for (var key in cell.metadata.DockerContainers) {
+            var msg = "<p>History #${record_id}: docker container [${container_id}] -- ${container_status}</p>";
+
+            var ccc = cell.metadata.DockerContainers[key];
+
+            msg = msg.replace("${record_id}", key);
+            msg = msg.replace("${container_id}", ccc['id']);
+            msg = msg.replace("${container_status}", ccc['status']);
+
+            container_html = container_html + msg;
+        }
+
+        docker_subarea.html(container_html);
+        return docker_area;
+    }
+
 
     function load_ipython_extension() {
         load_css('./main.css');
@@ -864,6 +966,10 @@ define([
 
         events.on("nbdocker.run", function(event, data) {
             OnRunHistory(event, data);
+        });
+
+        events.on("nbdocker.refresh", function(event, info) {
+            OnRefreshCellContainer(event, info);
         });
 
     }

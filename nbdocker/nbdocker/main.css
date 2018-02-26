@@ -11,3 +11,10 @@
     margin-top: 5px;
     margin-bottom: 5px;
 }
+
+.message_area {
+    padding: 5 5px;
+    border: 1px solid #CFCFCF;
+    background: #f7f7f7;
+    font-size: 80%;
+}

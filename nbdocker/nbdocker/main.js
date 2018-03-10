@@ -765,8 +765,9 @@ define([
             found = true;
             //console.log(tag);
             if (tag.indexOf("nbdocker") >= 0) {
+                console.log(cell.metadata.DockerContainers);
                 //if (cell.metadata.DockerContainers === undefined)
-                cell.metadata.DockerContainers = {}
+                //cell.metadata.DockerContainers = {}
 
                 return nbdocker_button.replace("#{nbdocker_his_id}", tag).replace("#{cell_id}", cell.cell_id);
             }
@@ -877,6 +878,7 @@ define([
             data: { cmd: "containerstatus", containers: JSON.stringify(cell.metadata.DockerContainers) },
             success: function(data, status) {
                 cell.metadata.DockerContainers = data['containers'];
+                //console.log(cell.metadata.DockerContainers);
                 update_docker_run_area(cell);
             }
         };
@@ -916,7 +918,8 @@ define([
                 .addClass('message_area')
                 .append($('<div/>').html(refresh_button))
                 .append($('<div/>').addClass('container_info'))
-                .appendTo(cell.element.find('.text_cell_render'));
+                //.appendTo(cell.element.find('.text_cell_render'));
+                .appendTo(cell.element.find('.inner_cell'));
         }
 
         var docker_subarea = cell.element.find('.container_info');

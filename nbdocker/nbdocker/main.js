@@ -823,7 +823,10 @@ define([
                     "id": data['container_id']['Id'].substring(0, 12),
                     "status": 'running...'
                 };
-
+                
+                if (cell.metadata.DockerContainers === undefined){
+                    cell.metadata.DockerContainers = {}
+                }
                 cell.metadata.DockerContainers[record_id.toString()] = container;
                 update_docker_run_area(cell);
             }

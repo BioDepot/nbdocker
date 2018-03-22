@@ -249,6 +249,7 @@ define([
         </thead>
         <tbody>
             <% _.each(images, function(image){ %>
+                <% if(image["RepoTags"] ){ %>
                 <tr>
                     <td>
                         <a class="create_container" href="javascript:void(0)">
@@ -260,7 +261,7 @@ define([
                     <td><%= HumanSize(image["Size"]) %> </td>
                     <td><%= moment.unix(image["Created"]).format("YYYY-MM-DD HH:mm:ss") %></td>
                 </tr>
-            <% }); %>
+            <% }}); %>
         </tbody>
     </table>
     `;
@@ -761,17 +762,9 @@ define([
             <i class="docker-icon fa"></i>
             </button>`;
         var found = false;
-        var newtext = text.replace(/{(.*?)}/g, function(match, tag, cha) {
+        var newtext = text.replace(/{nbdocker#(.*?)}/g, function(match, tag, cha) {
             found = true;
-            //console.log(tag);
-            if (tag.indexOf("nbdocker") >= 0) {
-                console.log(cell.metadata.DockerContainers);
-                //if (cell.metadata.DockerContainers === undefined)
-                //cell.metadata.DockerContainers = {}
-
-                return nbdocker_button.replace("#{nbdocker_his_id}", tag).replace("#{cell_id}", cell.cell_id);
-            }
-            //if (tag === "nbdocker") return nbdocker_button;
+            return nbdocker_button.replace("#{nbdocker_his_id}", tag).replace("#{cell_id}", cell.cell_id);
         });
 
         if (found)
@@ -849,7 +842,7 @@ define([
 
     function OnRunHistory(event, data) {
         cell_id = data['cell_id'];
-        record_id = data['record_id'].split("#")[1];
+        record_id = data['record_id'];
         console.log('run history record id:' + record_id);
 
         cell = locate_cell(cell_id);
@@ -948,7 +941,7 @@ define([
     function load_ipython_extension() {
         load_css('./main.css');
         load_css('./xterm.js-2.9.2/xterm.css');
-        // log to console
+
         console.info('Loaded Jupyter extension: nbdocker -- Docker for Jupter Notebook');
 
         // register new action
@@ -962,11 +955,13 @@ define([
 
         events.on("kernel_ready.Kernel", function() {
             if (Jupyter.notebook !== undefined && Jupyter.notebook._fully_loaded) {
+                console.info('Kernel Ready: render md cells');
                 update_md_cells();
             }
         });
 
         events.on("notebook_loaded.Notebook", function() {
+            console.info('Notebook loaded: render md cells');
             update_md_cells();
         });
 
@@ -976,6 +971,11 @@ define([
 
         events.on("nbdocker.refresh", function(event, info) {
             OnRefreshCellContainer(event, info);
+        });
+
+        events.on("notebook_saved.Notebook", function(){
+            console.info("notebook saved!");
+            on_save_history();
         });
 
     }

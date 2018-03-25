@@ -1,2 +1,17 @@
 # OS X
 .DS_Store
+
+*.egg-info/
+
+### JupyterNotebook ###
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+### VisualStudioCode ###
+.vscode/*
+.vscode-*.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history

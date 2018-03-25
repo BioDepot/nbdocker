@@ -152,9 +152,6 @@ define([
         </div>
         <div class="tab-pane fade" id="HistoryView">
             <div class="col-sm-12">
-                <button class="btn btn-default btn-primary" type="button" id="saveHistory">
-                    <span class="fa fa-floppy-o"> Save</span>
-                </button>
             </div>
             <div id="History">
                 <p>Loading...</p>
@@ -167,9 +164,9 @@ define([
     <table class="table table-striped table-hover">
         <thead><tr>
         <th width=6%>#</th>
-        <th width=6%>Container Id</th>
+        <th width=8%>Container Id</th>
         <th width=20%>Image</th>
-        <th width=48%>Mounts</th>
+        <th width=46%>Mounts</th>
         <th width=20%>Ports</th>
         <th width=10%>Status</th>
         </tr></thead>
@@ -280,15 +277,15 @@ define([
     var template_history = `
     <table class="table table-striped table-hover">
         <thead><tr>
-        <th width=11%>#</th>
+        <th width=15%>#</th>
         <th width=25%>Image</th>
-        <th width=64%>Others</th>
+        <th width=60%>Others</th>
         </tr></thead>
     <tbody>
-    <% _.each(histories, function(record){ %>
+    <% _.each(histories, function(record, idx){ %>
         <tr>
         <td>
-            <a class="btn remove_record" href="javascript:void(0)" record-id="<%= record["Id"] %>">
+            <span><b>#<%= idx%></b></span><a class="btn remove_record" href="javascript:void(0)" record-id="<%= record["Id"] %>">
             <i class="fa fa-trash" aria-hidden="true" record-id="<%= record["Id"] %>"></i></a>
             <a class="btn rerun_record" href="javascript:void(0)" record-id="<%= record["Id"] %>">
             <i class="fa fa-play" aria-hidden="true" record-id="<%= record["Id"] %>"></i></a>
@@ -593,9 +590,9 @@ define([
                         var record_id = $(e.target).attr('record-id');
                         rerun_history(record_id);
                     });
-                    if (data['history'].length > 0) {
-                        $('.nav-tabs a[href="#HistoryView"]').tab('show');
-                    }
+                    //if (data['history'].length > 0) {
+                    //    $('.nav-tabs a[href="#HistoryView"]').tab('show');
+                    //}
                 },
                 error: function(jqXHR, status, err) {
                     alert("list history failed: " + err);
@@ -631,7 +628,7 @@ define([
                     });
 
                     ajax(service_url, docker_list_container);
-                    ajax(service_url, docker_list_histories);
+                    //ajax(service_url, docker_list_histories);
 
                     // progress bar instance for pulling image
                     var bar = new ProgressBar.Line('#progress_container', {
@@ -853,10 +850,10 @@ define([
         };
 
         $.when(ajax(service_url, docker_get_history)).done(function(response) {
-            const max_cmd_length = 30;
+            //const max_cmd_length = 30;
 
             record_detail = response['history'];
-            command = record_detail['command'].substring(0, max_cmd_length);
+            command = record_detail['command'];
             record_info = "Image: " + record_detail['image'] + "</br>" + "Commands: " + command;
 
             dlgConfirmRunContainer(record_id, record_info, cell, run_history_quiet);
@@ -881,6 +878,23 @@ define([
         ajax(service_url, docker_get_container_status);
 
     }
+
+     // request to save histories
+     function OnSaveHistory(event, info) {
+        var docker_save_history = {
+            type: "POST",
+            data: { cmd: "savehistory", notebook_name: IPython.notebook.notebook_path },
+            success: function(data, status) {
+                console.log(data["message"]);
+            },
+            error: function(jqXHR, status, err) {
+                alert("save histories failed: " + err);
+            }
+        };
+
+        ajax(service_url, docker_save_history);
+    };
+
     // Runing status indicator
 
     function clear_docker_run_status(cells) {
@@ -973,9 +987,9 @@ define([
             OnRefreshCellContainer(event, info);
         });
 
-        events.on("notebook_saved.Notebook", function(){
+        events.on("notebook_saved.Notebook", function(event, info){
             console.info("notebook saved!");
-            on_save_history();
+            OnSaveHistory(event, info);
         });
 
     }

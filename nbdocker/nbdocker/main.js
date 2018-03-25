@@ -306,7 +306,7 @@ define([
         return _.template(template_history)({ histories: histories });
     }
 
-    var CreateContainer = function(image_name, fn_ready_create) {
+    var CreateContainer = function(image_name, start_options, fn_ready_create) {
         var create_container_template = `
             <div class="panel panel-info">
                 <div class="panel-heading">
@@ -338,8 +338,8 @@ define([
                             </div>
                         </div>
                         <div class="form-control-static row">Command</div>
-                        <div class="form-group col-sm-12 row">
-                            <input type="text" class="form-control" id="container_command" placeholder="e.g. samtools view -bS SRR1039508.sam ">
+                        <div class="form-group col-sm-12">
+                            <textarea class="form-control" id="container_command" rows="6" placeholder="e.g. samtools view -bS SRR1039508.sam" required/>
                         </div>
                     </form>
                 </div>
@@ -368,9 +368,22 @@ define([
                     }
                 }
             },
+            notebook: IPython.notebook,
+            keyboard_manager: IPython.notebook.keyboard_manager,
             open: function(event, ui) {
                 var that = $(this);
+                var host_dir = that.find('#host_dir');
                 var container_dir = that.find('#container_dir');
+                var port_internal = that.find('#internal_port');
+                var port_external = that.find('#external_port');
+                var commands = that.find('#container_command');
+                if(!_.isEmpty(start_options)){
+                    host_dir.val(start_options['host']);
+                    container_dir.val(start_options['container']);
+                    port_internal.val(start_options['internal']);
+                    port_external.val(start_options['external']);
+                    commands.val(start_options['command']);
+                };
                 that.find('#container_command').keypress(function(e, ui) {
                     if (e.which == 13) {
                         that.find('.btn-primary').first().click();
@@ -568,7 +581,7 @@ define([
                     $('#Images').html(ListImages(data['images']));
                     $("tr a.create_container").on('click', function(e) {
                         var image_id = $(e.target).attr('image-id');
-                        CreateContainer(image_id, create_container);
+                        CreateContainer(image_id, {}, create_container);
                     });
                 },
                 error: function(jqXHR, status, err) {
@@ -825,6 +838,31 @@ define([
         ajax(service_url, docker_run_history_quiet);
     };
 
+    function run_container(options) {
+        options["notebookname"] = IPython.notebook.notebook_path;
+        console.log(options);
+        var docker_create_container = {
+            type: "POST",
+            data: { cmd: "createcontainer", options: JSON.stringify(options) },
+            success: function(data, status) {
+                var container = {
+                    "id": data['container_id']['Id'].substring(0, 12),
+                    "status": 'running...'
+                };
+                
+                if (cell.metadata.DockerContainers === undefined){
+                    cell.metadata.DockerContainers = {}
+                }
+                cell.metadata.DockerContainers[record_id.toString()] = container;
+                update_docker_run_area(cell);
+            },
+            error: function(jqXHR, status, err) {
+                alert("create container failed: " + err);
+            }
+        };
+        ajax(service_url, docker_create_container);
+    };
+
     function locate_cell(cell_id) {
         var cells = IPython.notebook.get_cells();
         for (var i = 0; i < cells.length; i++) {
@@ -856,7 +894,8 @@ define([
             command = record_detail['command'];
             record_info = "Image: " + record_detail['image'] + "</br>" + "Commands: " + command;
 
-            dlgConfirmRunContainer(record_id, record_info, cell, run_history_quiet);
+            //dlgConfirmRunContainer(record_id, record_info, cell, run_history_quiet);
+            CreateContainer(record_detail['image'], record_detail, run_container);
         });
 
     };

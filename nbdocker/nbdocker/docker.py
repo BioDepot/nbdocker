@@ -461,7 +461,7 @@ class PullHandler(web.RequestHandler):
         self.set_header('content-type', 'text/event-stream')
         self.set_header('cache-control', 'no-cache')
 
-        print(registry, image_name, image_version)
+        # print(registry, image_name, image_version)
         
         if image_version is None:
             image_version = image_name

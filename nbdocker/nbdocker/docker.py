@@ -375,7 +375,15 @@ class DockerHandler(IPythonHandler):
         nb_name, _ = os.path.splitext(nb_name)
         record_id = self.get_body_argument('record_id')
         if nb_name in nbname_cmd_dict:
-            nbname_cmd_dict[nb_name][:] = [record for record in nbname_cmd_dict[nb_name] if str(record['Id']) != record_id]
+            hist_dict = []
+            rec_index = 0
+            for record in nbname_cmd_dict[nb_name]:
+                if str(record['Id']) != record_id:
+                    record['Id'] = rec_index
+                    rec_index += 1
+                    hist_dict.append(record)
+
+            nbname_cmd_dict[nb_name] = hist_dict
         self.log.info(nbname_cmd_dict[nb_name])
 
     def _event_rerun_history(self):

@@ -845,16 +845,20 @@ define([
             type: "POST",
             data: { cmd: "createcontainer", options: JSON.stringify(options) },
             success: function(data, status) {
-                var container = {
-                    "id": data['container_id']['Id'].substring(0, 12),
-                    "status": 'running...'
-                };
-                
-                if (cell.metadata.DockerContainers === undefined){
-                    cell.metadata.DockerContainers = {}
+                if (data['container_id'] == 'ImageNotFound'){
+                    alert("The docker image [" + options['image'] + "] doesn't exist, please pull it first!");
+                } else{
+                    var container = {
+                        "id": data['container_id']['Id'].substring(0, 12),
+                        "status": 'running...'
+                    };
+                    
+                    if (cell.metadata.DockerContainers === undefined){
+                        cell.metadata.DockerContainers = {}
+                    }
+                    cell.metadata.DockerContainers[record_id.toString()] = container;
+                    update_docker_run_area(cell);
                 }
-                cell.metadata.DockerContainers[record_id.toString()] = container;
-                update_docker_run_area(cell);
             },
             error: function(jqXHR, status, err) {
                 alert("create container failed: " + err);

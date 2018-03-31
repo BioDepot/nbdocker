@@ -238,20 +238,30 @@ class DockerHandler(IPythonHandler):
         
         _containerId = self._create_container(options)
 
-        # save the notebook name and its commands to the dict
-        nb_name = options['notebookname']
-        nb_name, _ = os.path.splitext(nb_name)
-        options['notebookname'] = nb_name
-        if nb_name in nbname_cmd_dict:
-            options['Id'] = len(nbname_cmd_dict[nb_name])
-            nbname_cmd_dict[nb_name].append(options)
-        else:
-            options['Id'] = 0;
-            nbname_cmd_dict[nb_name] = [options]
+        if _containerId != 'ImageNotFound':
+            # save the notebook name and its commands to the dict
+            nb_name = options['notebookname']
+            nb_name, _ = os.path.splitext(nb_name)
+            options['notebookname'] = nb_name
+            if nb_name in nbname_cmd_dict:
+                options['Id'] = len(nbname_cmd_dict[nb_name])
+                nbname_cmd_dict[nb_name].append(options)
+            else:
+                options['Id'] = 0;
+                nbname_cmd_dict[nb_name] = [options]
 
         return {'container_id': _containerId}
 
     def _create_container(self, options):
+        # Check if the image exists locally!
+        try:
+            docker_client = docker.from_env(version='auto')
+            docker_client.images.get(options['image'])
+        except docker.errors.ImageNotFound:
+            # image doesn't exist, pullit
+            return 'ImageNotFound'
+
+
         # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}
         if options['host'] and options['container']:
@@ -259,7 +269,7 @@ class DockerHandler(IPythonHandler):
 
         jupyter_user_volume = self._locate_user_data()
         if jupyter_user_volume:
-            volumes[jupyter_user_volume] = '/jupyterdata'
+            volumes[jupyter_user_volume] = '/.nbdocker'
 
         ports = {}
         if options['internal'] and options['external']:
@@ -287,6 +297,7 @@ class DockerHandler(IPythonHandler):
                                                      ports=ports,
                                                      command=commands,
                                                      host_config=host_config)
+
         self._docker.start(_containerId)
         return _containerId
 
@@ -423,12 +434,19 @@ class DockerHandler(IPythonHandler):
         data = self.get_body_argument('containers')
         containers = json.loads(data)
 
+        parttern = re.compile('Exited[a-zA-z\s\(]+(\d+)')
         for key in containers:
             c_front = containers[key]
             c = self._locate_container(c_front['id'], all=True)
             if c:
-                #self.log.info(c)
-                c_front['status'] = c['Status']
+                match = parttern.search(c['Status'])
+                if match:
+                    if match.group(1) == "0":
+                        c_front['status'] = 'Finished.'
+                    else:
+                        c_front['status'] = 'Error, code=' + match.group()                   
+                else:
+                    c_front['status'] = c['Status']
 
         return {'containers': containers}
 

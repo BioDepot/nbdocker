@@ -23,18 +23,18 @@ RUN usermod -aG docker $NB_USER
 USER $NB_USER
 
 RUN pip --no-cache-dir install --user --upgrade \
-        matplotlib \
-        numpy \
-        scipy \
-        sklearn \
-        pandas \
-        nltk \
-        tensorflow \
-        keras \
-        h5py \
-        pydot \
-        graphviz \
-        docker \
+    matplotlib \
+    numpy \
+    scipy \
+    sklearn \
+    pandas \
+    nltk \
+    tensorflow \
+    keras \
+    h5py \
+    pydot \
+    graphviz \
+    docker \
 	plotly \
 	sympy \
 	seaborn
@@ -45,14 +45,10 @@ RUN conda install -c conda-forge ipywidgets && \
 
 # install ipydocker and nbdocker
 USER root
-ADD ipydocker /home/$NB_USER/ipydocker
-ADD nbdocker /home/$NB_USER/nbdocker
+ADD . /home/$NB_USER/nbdocker
 RUN chown -R $NB_USER /home/$NB_USER/*docker
 USER $NB_USER
-# RUN python /home/$NB_USER/ipydocker/setup.py build
-RUN pip install -e /home/$NB_USER/ipydocker --user  && \
-    jupyter nbextension install --py --symlink --sys-prefix ipydocker && \
-    jupyter nbextension enable --py --sys-prefix ipydocker
+
 RUN pip install -e /home/$NB_USER/nbdocker --user && \
     jupyter serverextension enable --py --user nbdocker && \
     jupyter nbextension install /home/$NB_USER/nbdocker/nbdocker --user && \

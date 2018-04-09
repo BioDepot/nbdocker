@@ -34,7 +34,7 @@ class InstallCommand(install):
 
 setup(
     name='nbdocker',
-    version='0.1',
+    version='0.2',
     packages=['nbdocker'],
     cmdclass={
         'install': InstallCommand
@@ -44,7 +44,7 @@ setup(
     author_email='huj22@uw.edu',
     maintainer="Jiaming Hu",
     maintainer_email='huj22@uw.edu',
-    url='https://github.com/JMHOO/nbdocker',
+    url='https://github.com/BioDepot/nbdocker',
     license='BSD',
     keywords=['docker', 'nbextension', 'jupyter', 'notebook']
 )

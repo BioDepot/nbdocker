@@ -297,7 +297,6 @@ define([
     </tbody>
     </table>`;
     var ListHistories = function(histories) {
-        console.log(histories);
         histories.forEach(function(record) {
             record["Mounts"] = record["host"] + "->" + record["container"];
             record["Ports"] = record["external"] + ":" + record["internal"];
@@ -407,7 +406,9 @@ define([
                 "Remove": {
                     label: '<i class="fa fa-trash"></i> Remove',
                     class: "btn-danger",
-                    click: fn_confirmed(container_id)
+                    click: function() {
+                        fn_confirmed(container_id)
+                    }
                 }
             },
         });

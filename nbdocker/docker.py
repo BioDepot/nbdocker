@@ -8,7 +8,7 @@ import tempfile
 import uuid
 import shutil
 import time
-import docker
+import docker as dockerpy
 from queue import Queue, Empty
 from notebook.utils import url_path_join
 from notebook.base.handlers import IPythonHandler
@@ -20,17 +20,19 @@ from tornado.iostream import StreamClosedError
 g_docker_ = None
 try:
     if platform.system() is 'Windows':
-        g_docker_ = docker.APIClient(base_url='npipe:////./pipe/docker_engine')
+        g_docker_ = dockerpy.APIClient(base_url='npipe:////./pipe/docker_engine')
     else:
-        g_docker_ = docker.APIClient(base_url='unix:///var/run/docker.sock')
+        g_docker_ = dockerpy.APIClient(base_url='unix:///var/run/docker.sock')
 except:
     g_docker_ = None
+
 
 # global variables
 # notebook name and its docker commands history
 nbname_cmd_dict = {}
 # notebook working directory
 notebook_dir = ''
+
 
 class Build:
     def __init__(self, manager, uid, docker_cli, image_name, docker_file):
@@ -51,7 +53,7 @@ class Build:
 
         print('Start building image {0} ---->>> \n docker file: {1} \n use path: {2}'.format(self.image_name, shadow_dockerfile, build_path))
         try:
-            for rawline in self.docker_.build(path=build_path, tag=self.image_name, dockerfile=shadow_dockerfile, rm=True):
+            for rawline in self.docker_.build(path=build_path, tag=self.image_name, rm=True):
                 for jsonstr in rawline.decode('utf-8').split('\r\n')[:-1]:
                     log = jsonstr
                     try:
@@ -172,10 +174,9 @@ g_docker_builder = BuildManager()
 class DockerHandler(IPythonHandler):
     def initialize(self):
         if platform.system() is 'Windows':
-            self._docker = docker.APIClient(base_url='npipe:////./pipe/docker_engine')
+            self._docker = dockerpy.APIClient(base_url='npipe:////./pipe/docker_engine')
         else:
-            self._docker = docker.APIClient(base_url='unix:///var/run/docker.sock')
-
+            self._docker = dockerpy.APIClient(base_url='unix:///var/run/docker.sock')
 
     def _locate_user_data(self):
         user_volume = None
@@ -255,9 +256,9 @@ class DockerHandler(IPythonHandler):
     def _create_container(self, options):
         # Check if the image exists locally!
         try:
-            docker_client = docker.from_env(version='auto')
+            docker_client = dockerpy.from_env(version='auto')
             docker_client.images.get(options['image'])
-        except docker.errors.ImageNotFound:
+        except dockerpy.errors.ImageNotFound:
             # image doesn't exist, pullit
             return 'ImageNotFound'
 
@@ -488,12 +489,12 @@ class PullHandler(web.RequestHandler):
             image_name = registry + '/' + image_name
 
         # Check if the image exists locally!
-        docker_client = docker.from_env(version='auto')
+        docker_client = dockerpy.from_env(version='auto')
         try:
             docker_client.images.get(image_name)
             self.emit({'message': 'Image exists locally, pull completed.\n'})
             return
-        except docker.errors.ImageNotFound:
+        except dockerpy.errors.ImageNotFound:
             # image doesn't exist, so do a build!
             pass
 

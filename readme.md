@@ -1,4 +1,3 @@
-[![GitHub package version](https://img.shields.io/github/package-json/v/badges/shields.svg)](https://github.com/BioDepot/nbdocker)
 [![Docker Pulls](https://img.shields.io/docker/pulls/mashape/kong.svg)](https://hub.docker.com/r/biodepot/nbdocker/)
 
 NBDocker

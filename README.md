@@ -1,7 +1,8 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/biodepot/nbdocker.svg)](https://hub.docker.com/r/biodepot/nbdocker)
 [![Docker Image](https://images.microbadger.com/badges/image/biodepot/nbdocker.svg)](https://microbadger.com/images/biodepot/nbdocker)
 
-[![GitHub release](https://img.shields.io/github/release/qubyte/rubidium.svg)](https://github.com/BioDepot/nbdocker/releases/tag/v0.1)
+[![GitHub release](https://img.shields.io/github/release/biodepot/nbdocker.svg)](https://github.com/BioDepot/nbdocker/releases/tag/v0.1)
+
 
 
 NBDocker

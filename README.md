@@ -58,4 +58,13 @@ jupyter nbextension enable nbdocker/main --user
 ## Demo
 ![](nbdocker/nbdocker.gif)
 
+## ACKNOWLEDGEMENTS
+We would like to thank Dr. Wes Lloyd for helpful discussions in group meetings. We would like
+to thank Mr. Fang Chen for researching the different Jupyter magic commands and working on
+earlier implementations of the saving docker histories. L.H.H. and K.Y.Y. are supported by NIH
+grants U54HL127624 and R01GM126019. J.H. is supported by U54HL127624. We would also
+like to thank the Center for Data Science and the Institute of Technology at University of
+Washington Tacoma for the purchase of a computer server.
+
+
 Bioinformatics Group University of Washington Tacoma

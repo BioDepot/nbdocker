@@ -56,7 +56,9 @@ jupyter nbextension enable nbdocker/main --user
 ```
 
 ## Demo
-![](nbdocker/nbdocker.gif)
+[![nbdocker video](https://img.youtube.com/vi/H_s7_A8qb_0/0.jpg)](https://www.youtube.com/watch?v=H_s7_A8qb_0)
+
+
 
 ## ACKNOWLEDGEMENTS
 We would like to thank Dr. Wes Lloyd for helpful discussions in group meetings. We would like

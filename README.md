@@ -51,11 +51,11 @@ Finnally, install server extension and notebook extension for Jupyter:
 
 ```bash
 jupyter serverextension enable --py --user nbdocker
-jupyter nbextension install nbdocker/nbdocker --user
+jupyter nbextension install nbdocker --user
 jupyter nbextension enable nbdocker/main --user
 ```
 
-## Demo
+## Demo on Youtube
 [![nbdocker video](https://img.youtube.com/vi/H_s7_A8qb_0/0.jpg)](https://www.youtube.com/watch?v=H_s7_A8qb_0)
 
 

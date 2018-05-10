@@ -13,9 +13,13 @@ The nbdocker is an extension that allows for different Docker containers to be e
 
 ## GENERAL INFORMATION
 Docker image: https://hub.docker.com/r/biodepot/nbdocker/
+
 Pre-print: https://www.biorxiv.org/content/early/2018/05/02/309567
+
 Authors: Jiaming Hu, Ling-Hong Hung, Ka Yee Yeung
+
 Affiliation: Institute of Technology, University of Washington Tacoma, WA, USA
+
 Correspondence: kayee@uw.edu
 
 ## Installation

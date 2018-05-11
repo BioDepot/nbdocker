@@ -29,6 +29,14 @@ A pre-installed Docker image was provided which contains Jupyter notebook and nb
 docker pull biodepot/nbdocker
 ```
 
+To run the nbdocker container:
+
+```shell
+docker run -it -p 8888:8888 -v /var/run/docker.sock:/var/run/docker.sock -v <your local path>:/home/jovyan/work --privileged --group-add root biodepot/nbdocker
+```
+
+You will then be given a URL. Copy/paste this URL into your browser and you can use nbdocker in your browser.
+
 ## Development Install
 The installation instructions below are intended for developers who want to manually install the nbdocker for the purposes of development.
 

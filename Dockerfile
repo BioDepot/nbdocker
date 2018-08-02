@@ -39,9 +39,9 @@ RUN pip --no-cache-dir install --user --upgrade \
 	sympy \
 	seaborn
 
-RUN conda install -c conda-forge ipywidgets && \
-    conda install -c conda-forge jupyter_nbextensions_configurator && \
-    conda install -c conda-forge jupyter_contrib_nbextensions
+RUN conda install -yc conda-forge ipywidgets && \
+    conda install -yc conda-forge jupyter_nbextensions_configurator && \
+    conda install -yc conda-forge jupyter_contrib_nbextensions
 
 # install ipydocker and nbdocker
 USER root

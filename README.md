@@ -18,7 +18,7 @@ Pre-print: https://www.biorxiv.org/content/early/2018/05/02/309567
 
 Authors: Jiaming Hu, Ling-Hong Hung, Ka Yee Yeung
 
-Affiliation: Institute of Technology, University of Washington Tacoma, WA, USA
+Affiliation: School of Engineering and Technology, University of Washington Tacoma, WA, USA
 
 Correspondence: kayee@uw.edu
 
@@ -75,6 +75,8 @@ jupyter nbextension enable nbdocker/main --user
 [![nbdocker video](https://img.youtube.com/vi/H_s7_A8qb_0/0.jpg)](https://www.youtube.com/watch?v=H_s7_A8qb_0)
 
 
+## Troubleshooting
+If you get an internal server error, you can try to run "sudo chmod 666 /var/run/docker.sock"
 
 ## ACKNOWLEDGEMENTS
 We would like to thank Dr. Wes Lloyd for helpful discussions in group meetings. We would like

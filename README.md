@@ -59,11 +59,12 @@ python3 -m pip install jupyter
 #### Install nbdocker package
 ```bash
 cd nbdocker
-pip3 install -e --user .
+python3 -m pip install -e . --user 
 ```
+Note that there is period (.) between -e and --user
 
 #### Jupyter extension
-Finnally, install server extension and notebook extension for Jupyter:
+Finally, install server extension and notebook extension for Jupyter:
 
 ```bash
 jupyter serverextension enable --py --user nbdocker

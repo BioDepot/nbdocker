@@ -232,7 +232,20 @@ class DockerHandler(IPythonHandler):
 
     def _event_list_containers(self):
         return {'containers': self._docker.containers()}
-
+    def _pullImage(self,client,imageTag):
+        image,tag = imageTag.split(":")
+        if not tag:
+            tag='latest'
+        retvalue=client.images.pull(image,tag=tag)
+        return retvalue.id
+        
+    def _mergeJson(self,sourceJson,jsonInputKey):
+        #for now use overwrite mode - anything in extraJson overwrites the original 
+        extraJson=json.loads(sourceJson[jsonInputKey])
+        sourceJson.pop(jsonInputKey)
+        for key,value in extraJson.items():
+            souceJson[key]=value
+        return sourceJson
     def _event_create_container(self):
         options = self.get_body_argument('options')
         options = json.loads(options)
@@ -259,9 +272,9 @@ class DockerHandler(IPythonHandler):
             docker_client = dockerpy.from_env(version='auto')
             docker_client.images.get(options['image'])
         except dockerpy.errors.ImageNotFound:
-            # image doesn't exist, pullit
-            return 'ImageNotFound'
-
+            print ("Pulling image {}".format(options['image']))
+            imageID = self._pullImage(docker_client,options['image'])
+            print (imageID)
 
         # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}

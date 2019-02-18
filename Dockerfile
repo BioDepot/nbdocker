@@ -1,60 +1,64 @@
-FROM biodepot/bioc-base-jupyter
+FROM biodepot/bioconductor:3.6__ubuntu-18.04__R-3.4.3__081318
+MAINTAINER lhhung@uw.edu
+ENV NB_USER jovyan
+#install jupyter and docker python api 
+RUN apt-get update && apt-get -y install \ 
+    build-essential python3-all python3-pip libncurses5-dev libncursesw5-dev libzmq3-dev libcurl4-openssl-dev libssl-dev zlib1g-dev\
+    && pip3 install --upgrade pip \
+    && pip install jupyter ipywidgets jupyter_nbextensions_configurator jupyter_contrib_nbextensions requests docker \
+    && apt-get -y remove build-essential \
+    && apt-get autoclean -y \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+    
+#install Docker-ce
+RUN apt-get update && apt-get install -y  \
+    apt-transport-https ca-certificates software-properties-common curl gnupg2 wget git\
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -\
+    &&  add-apt-repository -y \
+    "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable" \
+    && apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io\
+    && apt-get remove -y apt-transport-https software-properties-common gnupg2 curl wget \
+    && apt-get autoclean -y \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* 
+    
+#install IR kernel
+ADD installIR.R /tmp
+RUN Rscript /tmp/installIR.R 
+#RUN R -e "install.packages(c('IRdisplay', 'repr', 'devtools', 'evaluate', 'crayon','pbdZMQ', 'uuid', 'digest' ),repos = 'http://cran.us.r-project.org'); \
+#          devtools::install_github('IRkernel/IRkernel',host='https://api.github.com'); "
 
-MAINTAINER Jimmy huj22@uw.edu
+RUN useradd -rm -d /home/$NB_USER -s /bin/bash -g root -G sudo -u 1000 $NB_USER
 
+#Set permissions for nbdocker to user
 USER root
+ADD nbdocker /home/$NB_USER/nbdocker
+ADD setup.py /home/$NB_USER/.
+RUN chown -R $NB_USER /home/$NB_USER/nbdocker
 
-# Python3
-RUN apt-get update && \
-    apt-get install -y cmake libhdf5-dev graphviz && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# RUN pip3 install --upgrade pip
-RUN pip install --upgrade pip
-
-# install docker on the jupyterhub container
-RUN wget https://get.docker.com -q -O /tmp/getdocker && \
-    chmod +x /tmp/getdocker && \
-    sh /tmp/getdocker
-
-RUN usermod -aG docker $NB_USER
+#install IR kernel
+RUN R -e "install.packages(c('IRdisplay', 'repr', 'devtools', 'evaluate', 'crayon','pbdZMQ', 'uuid', 'digest' ),repos = 'http://cran.us.r-project.org'); \
+          devtools::install_github('IRkernel/IRkernel',host='https://api.github.com'); "
+          
+#Set permissions for nbdocker to user
+USER root
+ADD nbdocker /home/$NB_USER/nbdocker
+ADD setup.py /home/$NB_USER/.
+RUN chown -R $NB_USER /home/$NB_USER/nbdocker
 
 USER $NB_USER
 
-RUN pip --no-cache-dir install --user --upgrade \
-    matplotlib \
-    numpy \
-    scipy \
-    sklearn \
-    pandas \
-    nltk \
-    tensorflow \
-    keras \
-    h5py \
-    pydot \
-    graphviz \
-    docker \
-	plotly \
-	sympy \
-	seaborn
-
-RUN conda install -yc conda-forge ipywidgets && \
-    conda install -yc conda-forge jupyter_nbextensions_configurator && \
-    conda install -yc conda-forge jupyter_contrib_nbextensions
-
-# install ipydocker and nbdocker
-USER root
-ADD . /home/$NB_USER/nbdocker
-RUN chown -R $NB_USER /home/$NB_USER/*docker
-USER $NB_USER
-
-RUN pip install -e /home/$NB_USER/nbdocker --user && \
+RUN cd /home/$NB_USER/ && pip install -e . --user && \
     jupyter serverextension enable --py --user nbdocker && \
-    jupyter nbextension install /home/$NB_USER/nbdocker/nbdocker --user && \
+    jupyter nbextension install nbdocker --user && \
     jupyter nbextension enable nbdocker/main --user
-ENV NLTK_DATA /home/$NB_USER/.local/nltk_data
 
-RUN mkdir -p $NLTK_DATA
+#install R kernel    
+RUN R -e "IRkernel::installspec()"
 
+#setup starting enviroinment
 WORKDIR /home/$NB_USER/work
+CMD ["jupyter","notebook","--ip","0.0.0.0"]
+
+

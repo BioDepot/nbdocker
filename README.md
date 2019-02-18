@@ -52,18 +52,19 @@ If you don't have [Jupyter Notebook](http://jupyter.org/) installed, you can ins
 python3 -m pip install jupyter
 ```
 
-### Install NBDocker
+### Install nbdocker
 #### Clone repo
 > git clone https://github.com/jmhoo/nbdocker.git
 
 #### Install nbdocker package
 ```bash
 cd nbdocker
-pip3 install -e --user .
+python3 -m pip install -e . --user 
 ```
+Note that there is a period (.) between -e and --user
 
 #### Jupyter extension
-Finnally, install server extension and notebook extension for Jupyter:
+Finally, install server extension and notebook extension for Jupyter:
 
 ```bash
 jupyter serverextension enable --py --user nbdocker

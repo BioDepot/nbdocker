@@ -222,7 +222,6 @@ define([
             var e = Math.floor(Math.log(bytes) / Math.log(1024)); 
             return (bytes/Math.pow(1024, e)).toFixed(2)+" "+" KMGTP".charAt(e)+"iB";
         };
-
         SplitTag = function(RepoTag){
             var tag_name = RepoTag
             var tag_version = "<none>"
@@ -232,6 +231,18 @@ define([
             }
             return [tag_name, tag_version]
         };
+        UnixTime = function(UNIX_timestamp){
+            var a = new Date(UNIX_timestamp * 1000);
+            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            var year = a.getFullYear();
+            var month = months[a.getMonth()];
+            var date = a.getDate();
+            var hour = a.getHours();
+            var min = a.getMinutes();
+            var sec = a.getSeconds();
+            var time = month + ' ' + date + ' ' + year + ' ' + hour + ':' + min + ':' + sec ;
+            return time;
+        };        
     %>
     <table class="table table-hover" id="image_table">
         <thead>
@@ -256,7 +267,7 @@ define([
                     <td><%= SplitTag(image["RepoTags"][0])[0] %></td>
                     <td><%= SplitTag(image["RepoTags"][0])[1] %></td>
                     <td><%= HumanSize(image["Size"]) %> </td>
-                    <td><%= moment.unix(image["Created"]).format("YYYY-MM-DD HH:mm:ss") %></td>
+                    <td><%= UnixTime(image["Created"]) %></td>
                 </tr>
             <% }}); %>
         </tbody>

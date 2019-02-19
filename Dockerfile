@@ -2,7 +2,7 @@ FROM biodepot/nbdocker-base-ir:user
 MAINTAINER lhhung@uw.edu
 
 #Set permissions for nbdocker to user
-USER root
+
 ADD nbdocker /home/$NB_USER/nbdocker
 ADD setup.py /home/$NB_USER/.
 RUN chown -R $NB_USER /home/$NB_USER/nbdocker

@@ -228,10 +228,12 @@ class DockerHandler(IPythonHandler):
         return self._docker.info()
 
     def _event_list_images(self):
+        print(self._docker.images())
         return {'images': self._docker.images()}
 
     def _event_list_containers(self):
         return {'containers': self._docker.containers()}
+        
     def _pullImage(self,client,imageTag):
         image,tag = imageTag.split(":")
         if not tag:

@@ -1,7 +1,5 @@
-FROM biodepot/nbdocker-base-ir:latest
+FROM biodepot/nbdocker-base-ir:user
 MAINTAINER lhhung@uw.edu
-ENV NB_USER jovyan
-RUN useradd -rm -d /home/$NB_USER -s /bin/bash -g root -G sudo -u 1000 $NB_USER
 
 #Set permissions for nbdocker to user
 USER root
@@ -9,6 +7,7 @@ ADD nbdocker /home/$NB_USER/nbdocker
 ADD setup.py /home/$NB_USER/.
 RUN chown -R $NB_USER /home/$NB_USER/nbdocker
 
+USER $NB_USER
 #install nbdocker
 RUN cd /home/$NB_USER/ && pip install -e . --user && \
     jupyter serverextension enable --py --user nbdocker && \

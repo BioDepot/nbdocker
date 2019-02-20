@@ -306,7 +306,7 @@ class DockerHandler(IPythonHandler):
         commands = ''
         if options['command']:
             commands = 'bash -c "' + options['command'] + '"'
-
+        self.log.info('volumes are {}'.format(json.dumps(volumes)))
         _containerId = self._docker.create_container(image=options['image'],
                                                      volumes=volumes,
                                                      ports=ports,
@@ -358,13 +358,13 @@ class DockerHandler(IPythonHandler):
         nb_name, _ = os.path.splitext(nb_path)
 
         self.log.info("nbdocker saving {} history".format(nb_name))
-
+        self.log.info("nbdocker saving to path {} and name {}".format(nb_path, nb_name))
         if not nb_name or nb_name not in nbname_cmd_dict:
             return {'message': 'No history!'}
         else:
             cmds = nbname_cmd_dict[nb_name]
-            print("saving cmd history to: " + nb_path)
-            with open(nb_path) as data_file:
+            self.log.info("cmds are {}".format(cmds))
+            with open(nb_path, encoding="utf-8") as data_file:
                 data = json.load(data_file)
             data["metadata"]["cmd_history"] = cmds 
             with open(nb_path, 'w') as f:
@@ -376,8 +376,11 @@ class DockerHandler(IPythonHandler):
         if nb_name not in nbname_cmd_dict:
             self.log.info("Loading history from notebook's metadata")
             cmds = []
-            with open(nb_path) as f:
-                data = json.load(f)
+            try:
+                with open(nb_path,encoding="utf-8") as f:
+                    data=json.load(f)
+            except IOError:
+                self.log.info("Could not read file: {}".format(nb_path))
             if "cmd_history" in data["metadata"]:
                 nbname_cmd_dict[nb_name] = data["metadata"]["cmd_history"]
             else:

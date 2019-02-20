@@ -1,13 +1,13 @@
-FROM biodepot/nbdocker-base-ir:user
+FROM biodepot/nbdocker-rbase:ubuntu_18.04__bioc_3.6__R_3.4.2
 MAINTAINER lhhung@uw.edu
 
+RUN R -e "install.packages('Cairo',repos = 'http://cran.us.r-project.org')"
 #Set permissions for nbdocker to user
-
+RUN chown -R $NB_USER:$NB_USER /home/$NB_USER
+RUN chown -R $NB_USER:$NB_USER /usr/local/rhome
+USER $NB_USER
 ADD nbdocker /home/$NB_USER/nbdocker
 ADD setup.py /home/$NB_USER/.
-RUN chown -R $NB_USER /home/$NB_USER/nbdocker
-
-USER $NB_USER
 #install nbdocker
 RUN cd /home/$NB_USER/ && pip install -e . --user && \
     jupyter serverextension enable --py --user nbdocker && \
@@ -19,4 +19,5 @@ RUN R -e "IRkernel::installspec()"
 
 #setup starting enviroinment
 WORKDIR /home/$NB_USER/work
+RUN echo "options(bitmapType='cairo')" > /home/$NB_USER/.Rprofile
 CMD ["jupyter","notebook","--ip","0.0.0.0"]

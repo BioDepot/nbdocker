@@ -846,7 +846,7 @@ define([
                 update_docker_run_area(cell);
             }
         };
-        console.log('Runing history #' + record_id);
+        console.log('Running history #' + record_id);
         ajax(service_url, docker_run_history_quiet);
     };
 
@@ -859,6 +859,7 @@ define([
             success: function(data, status) {
                 if (data['container_id'] == 'ImageNotFound'){
                     alert("The docker image [" + options['image'] + "] doesn't exist, please pull it first!");
+                    #update_docker_run_area(cell);
                 } else{
                     var container = {
                         "id": data['container_id']['Id'].substring(0, 12),
@@ -915,7 +916,30 @@ define([
         });
 
     };
+    function OnPullImage(event, data) {
+        cell_id = data['cell_id'];
+        record_id = data['record_id'];
+        console.log('run history record id:' + record_id);
 
+        cell = locate_cell(cell_id);
+        var docker_get_history = {
+            type: "POST",
+            data: { cmd: "gethistory", record_id: record_id, notebook_name: IPython.notebook.notebook_path },
+            success: function(data, status) {}
+        };
+
+        $.when(ajax(service_url, docker_get_history)).done(function(response) {
+            //const max_cmd_length = 30;
+
+            record_detail = response['history'];
+            command = record_detail['command'];
+            record_info = "Image: " + record_detail['image'] + "</br>" + "Commands: " + command;
+
+            //dlgConfirmRunContainer(record_id, record_info, cell, run_history_quiet);
+            CreateContainer(record_detail['image'], record_detail, run_container);
+        });
+
+    };
     function OnRefreshCellContainer(event, info) {
         cell_id = info['cell_id'];
 

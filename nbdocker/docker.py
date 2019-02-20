@@ -273,9 +273,7 @@ class DockerHandler(IPythonHandler):
             docker_client = dockerpy.from_env(version='auto')
             docker_client.images.get(options['image'])
         except dockerpy.errors.ImageNotFound:
-            print ("Pulling image {}".format(options['image']))
-            imageID = self._pullImage(docker_client,options['image'])
-            print (imageID)
+            return 'ImageNotFound'
 
         # passing docker.sock into container so that the container could access docker engine
         volumes = {'/var/run/docker.sock': '/var/run/docker.sock'}

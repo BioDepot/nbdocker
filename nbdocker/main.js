@@ -859,7 +859,6 @@ define([
             success: function(data, status) {
                 if (data['container_id'] == 'ImageNotFound'){
                     alert("The docker image [" + options['image'] + "] doesn't exist, please pull it first!");
-                    #update_docker_run_area(cell);
                 } else{
                     var container = {
                         "id": data['container_id']['Id'].substring(0, 12),

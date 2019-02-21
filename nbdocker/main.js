@@ -858,7 +858,49 @@ define([
             data: { cmd: "createcontainer", options: JSON.stringify(options) },
             success: function(data, status) {
                 if (data['container_id'] == 'ImageNotFound'){
-                    alert("The docker image [" + options['image'] + "] doesn't exist, please pull it first!");
+                    alert("The docker image [" + options['image'] + "] attempting to pull!");
+                    var repo=options['image']
+                    var image_name = '';
+                    var image_version = '';
+                    var container = {
+                        "id": options['image'],
+                        "status": 'pulling...'
+                    };
+                    
+                    if (cell.metadata.DockerContainers === undefined){
+                        cell.metadata.DockerContainers = {}
+                    }
+                    cell.metadata.DockerContainers[record_id.toString()] = container;
+                    update_docker_run_area(cell)
+                    
+
+                    repoTags = repo.split(':');
+                    if (repoTags.length == 2) {
+                        image_name = repoTags[0];
+                        image_version = repoTags[1];
+                    } else {
+                        image_name = repo;
+                        image_version = 'latest';
+                    }
+                    var pull = new PullImage(image_name, image_version);
+                    pull.onMessage(function(data) {
+                        if (data.message !== undefined) {
+                            var message_level = 'info';
+                            if (data.message == 'Succeeded') { message_level = "success"; } else if (data.message == 'Failed') { message_level = "error"; }
+                            if (data.message == 'Succeeded' || data.message == 'Failed' || data.message.indexOf('Image exists locally') != -1) {
+                                pull.close();
+                                if (data.message == 'Succeeded') {
+                                    container['status']='successfully pulled';
+                                    cell.metadata.DockerContainers[record_id.toString()] = container;
+                                    update_docker_run_area(cell);                                                    
+                                }
+                            }
+                            console.log(data.message);
+                        } else {
+                            console.log(data);
+                        }
+                    });
+                    pull.fetch();                    
                 } else{
                     var container = {
                         "id": data['container_id']['Id'].substring(0, 12),

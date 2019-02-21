@@ -20,4 +20,4 @@ RUN R -e "IRkernel::installspec()"
 #setup starting enviroinment
 WORKDIR /home/$NB_USER/work
 RUN echo "options(bitmapType='cairo')" > /home/$NB_USER/.Rprofile
-CMD ["jupyter","notebook","--ip","0.0.0.0"]
+CMD ["/bin/bash", "-c", "sudo chmod 666 /var/run/docker.sock && jupyter notebook --ip 0.0.0.0"]

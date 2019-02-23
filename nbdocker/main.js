@@ -395,7 +395,7 @@ define([
                     commands.val(start_options['command']);
                 };
                 that.find('#container_command').keypress(function(e, ui) {
-                    if (e.which == 13) {
+                    if (e.which == 13 && !e.shiftKey) {
                         that.find('.btn-primary').first().click();
                         return false;
                     }

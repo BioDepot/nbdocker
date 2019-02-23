@@ -8,6 +8,7 @@ import tempfile
 import uuid
 import shutil
 import time
+import copy
 import docker as dockerpy
 from queue import Queue, Empty
 from notebook.utils import url_path_join
@@ -242,16 +243,23 @@ class DockerHandler(IPythonHandler):
         
     def _mergeJson(self,sourceJson,jsonInputKey):
         #for now use overwrite mode - anything in extraJson overwrites the original 
-        extraJson=json.loads(sourceJson[jsonInputKey])
-        sourceJson.pop(jsonInputKey)
+        cleanString=sourceJson[jsonInputKey].replace('\r\n', '')
+        cleanString=sourceJson[jsonInputKey].replace('\n', '')
+        extraJson=json.loads(cleanString)
+        outputJson=copy.deepcopy(sourceJson)
+        outputJson.pop(jsonInputKey)
         for key,value in extraJson.items():
-            souceJson[key]=value
-        return sourceJson
+            outputJson[key]=value
+        return outputJson
     def _event_create_container(self):
         options = self.get_body_argument('options')
-        options = json.loads(options)
-        
-        _containerId = self._create_container(options)
+        options = json.loads(options,strict=False)
+        mergedOptions=options
+        if options['command'] and options['command'][0] == "{":
+            mergedOptions=self._mergeJson(options,'command')
+        print("options are {}\n".format(options))
+        print("merged options are {}\n".format(mergedOptions))
+        _containerId = self._create_container(mergedOptions)
 
         if _containerId != 'ImageNotFound':
             # save the notebook name and its commands to the dict

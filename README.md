@@ -73,7 +73,7 @@ jupyter nbextension enable nbdocker/main --user
 ```
 
 ## Demo on Youtube
-[![nbdocker video](https://img.youtube.com/vi/H_s7_A8qb_0/0.jpg)](https://www.youtube.com/watch?v=H_s7_A8qb_0)
+[![nbdocker video](https://img.youtube.com/vi/ywMWjfkLlOQ/0.jpg)](https://www.youtube.com/watch?v=ywMWjfkLlOQ)
 
 
 ## Troubleshooting

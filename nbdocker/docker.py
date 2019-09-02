@@ -257,6 +257,8 @@ class DockerHandler(IPythonHandler):
         mergedOptions=options
         if options['command'] and options['command'][0] == "{":
             mergedOptions=self._mergeJson(options,'command')
+        raw_params = options['raw_params']
+        print("Raw JSON params: {} \n".format(raw_params))
         print("options are {}\n".format(options))
         print("merged options are {}\n".format(mergedOptions))
         _containerId = self._create_container(mergedOptions)

@@ -11,8 +11,9 @@ define([
     './progressbar',
     './xterm.js-2.9.2/xterm',
     './xterm.js-2.9.2/addons/fit/fit',
+    './jsoneditor/jsoneditor',
     './notify'
-], function(require, IPython, dialog, utils, events, cell, textcell, codecell, $, ProgressBar, Terminal, fitAddon) {
+], function(require, IPython, dialog, utils, events, cell, textcell, codecell, $, ProgressBar, Terminal, fitAddon, JsonEditor) {
 
     // Object for retrieve pull message
     function PullImage(image_name, image_version) {
@@ -351,6 +352,7 @@ define([
                         <div class="form-group col-sm-12">
                             <textarea class="form-control" id="container_command" rows="6" placeholder="e.g. samtools view -bS SRR1039508.sam" required/>
                         </div>
+                        <div class="col-sm-12" id="jsoneditor"/>
                     </form>
                 </div>
             </div>`
@@ -358,6 +360,7 @@ define([
         var elements = $('<div/>').append(
             $("<p/>").html(_.template(create_container_template)({ image_id: image_name })));
 
+        var g_json_editor = null;
         var mod = dialog.modal({
             title: "Create Container",
             body: elements,
@@ -372,6 +375,7 @@ define([
                             "external": $(this).find('#external_port').val(),
                             "internal": $(this).find('#internal_port').val(),
                             "command": $(this).find('#container_command').val(),
+                            "raw_params": g_json_editor.get(),
                             "image": image_name,
                         };
                         fn_ready_create(obj);
@@ -394,6 +398,17 @@ define([
                     port_external.val(start_options['external']);
                     commands.val(start_options['command']);
                 };
+                const json_editor_container = document.getElementById("jsoneditor"); //that.find("#jsoneditor");
+                const editor_options = {};
+                const initialJson = {
+                    "host": null,
+                    "container": null,
+                    "external": null,
+                    "internal": null,
+                    "command": null
+                };
+                g_json_editor = new JsonEditor(json_editor_container, editor_options)
+                g_json_editor.set(initialJson);
                 that.find('#container_command').keypress(function(e, ui) {
                     if (e.which == 13 && !e.shiftKey) {
                         that.find('.btn-primary').first().click();
@@ -1073,8 +1088,9 @@ define([
 
 
     function load_ipython_extension() {
-        load_css('./main.css');
-        load_css('./xterm.js-2.9.2/xterm.css');
+        load_css("./main.css");
+        load_css("./xterm.js-2.9.2/xterm.css");
+        load_css("./jsoneditor/jsoneditor.css");
 
         console.info('Loaded Jupyter extension: nbdocker -- Docker for Jupter Notebook');
 
